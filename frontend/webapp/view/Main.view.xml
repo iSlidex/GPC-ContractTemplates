@@ -1,0 +1,195 @@
+<mvc:View
+    controllerName="com.gpc.contracts.GPCGestindeContratos.controller.Main"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+
+    <Page
+        id="contractsPage"
+        title="GPC - Gestión de Contratos"
+        class="sapUiResponsiveContentPadding">
+
+        <content>
+            <VBox id="mainContainer" class="sapUiMediumMargin" width="100%">
+
+                <Title
+                    id="mainTitle"
+                    text="PoC Funcional de Gestión Documental de Contratos"
+                    level="H2"
+                    class="sapUiSmallMarginBottom" />
+
+                <Text
+                    id="mainDescription"
+                    text="La aplicación lee plantillas DOCX, detecta sus variables, genera formularios dinámicos y permite producir documentos DOCX/PDF para firma."
+                    class="sapUiSmallMarginBottom" />
+
+                <Toolbar id="mainToolbar" class="sapUiSmallMarginBottom">
+                    <ObjectStatus
+                        id="backendStatus"
+                        text="{app>/backendStatus}"
+                        state="{app>/backendStatusState}" />
+                    <ToolbarSpacer id="toolbarSpacer" />
+                    <Button
+                        id="reloadButton"
+                        text="Recargar repositorio"
+                        icon="sap-icon://refresh"
+                        press=".onReload" />
+                </Toolbar>
+
+                <Panel
+                    id="processPanel"
+                    headerText="Flujo funcional"
+                    expandable="false"
+                    class="sapUiSmallMarginBottom">
+                    <content>
+                        <HBox
+                            id="processFlowBox"
+                            alignItems="Center"
+                            justifyContent="SpaceAround"
+                            width="100%">
+                            <ObjectStatus id="stepTemplate" text="1. Seleccionar plantilla" state="Success" icon="sap-icon://document-text" />
+                            <Text id="arrow1" text="→" />
+                            <ObjectStatus id="stepVariables" text="2. Leer variables" state="Information" icon="sap-icon://syntax" />
+                            <Text id="arrow2" text="→" />
+                            <ObjectStatus id="stepForm" text="3. Formulario dinámico" state="Information" icon="sap-icon://form" />
+                            <Text id="arrow3" text="→" />
+                            <ObjectStatus id="stepGenerate" text="4. Generar DOCX/PDF" state="Warning" icon="sap-icon://documents" />
+                            <Text id="arrow4" text="→" />
+                            <ObjectStatus id="stepSignature" text="5. Listo para firma" state="Success" icon="sap-icon://signature" />
+                        </HBox>
+                    </content>
+                </Panel>
+
+                <Panel
+                    id="templatesPanel"
+                    headerText="Plantillas disponibles"
+                    expandable="false"
+                    class="sapUiSmallMarginBottom">
+                    <content>
+                        <Table
+                            id="templatesTable"
+                            items="{app>/templates}"
+                            inset="false">
+
+                            <columns>
+                                <Column id="templateNameColumn" width="24rem">
+                                    <Text id="templateNameColumnText" text="Plantilla" />
+                                </Column>
+                                <Column id="templateCategoryColumn">
+                                    <Text id="templateCategoryColumnText" text="Categoría" />
+                                </Column>
+                                <Column id="templateTypeColumn">
+                                    <Text id="templateTypeColumnText" text="Tipo" />
+                                </Column>
+                                <Column id="templateVersionColumn">
+                                    <Text id="templateVersionColumnText" text="Versión" />
+                                </Column>
+                                <Column id="templateStatusColumn">
+                                    <Text id="templateStatusColumnText" text="Estado" />
+                                </Column>
+                                <Column id="templateActionsColumn" width="16rem">
+                                    <Text id="templateActionsColumnText" text="Acciones" />
+                                </Column>
+                            </columns>
+
+                            <items>
+                                <ColumnListItem id="templateRow">
+                                    <cells>
+                                        <ObjectIdentifier
+                                            id="templateIdentifier"
+                                            title="{app>name}"
+                                            text="{app>relativePath}" />
+
+                                        <Text id="templateCategoryText" text="{app>category}" />
+
+                                        <Text id="templateTypeText" text="{app>contractType}" />
+
+                                        <Text id="templateVersionText" text="{app>version}" />
+
+                                        <ObjectStatus
+                                            id="templateStatus"
+                                            text="{app>status}"
+                                            state="Success" />
+
+                                        <HBox id="templateActionsBox" renderType="Bare" wrap="Wrap">
+                                            <Button
+                                                id="viewVariablesButton"
+                                                text="Variables"
+                                                icon="sap-icon://syntax"
+                                                type="Transparent"
+                                                press=".onShowVariables" />
+
+                                            <Button
+                                                id="useTemplateButton"
+                                                text="Usar plantilla"
+                                                icon="sap-icon://form"
+                                                type="Emphasized"
+                                                press=".onUseTemplate" />
+                                        </HBox>
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+
+                <Panel
+                    id="repositoryPanel"
+                    headerText="Repositorio de archivos y versiones"
+                    expandable="false"
+                    class="sapUiSmallMarginBottom">
+                    <content>
+                        <Tree
+                            id="repositoryTree"
+                            items="{path: 'app>/repositoryTree'}">
+                            <StandardTreeItem
+                                id="repositoryTreeItem"
+                                title="{app>name}"
+                                icon="{app>icon}"
+                                type="Active"
+                                press=".onRepositoryItemPress" />
+                        </Tree>
+                    </content>
+                </Panel>
+
+                <Panel
+                    id="generationPanel"
+                    headerText="Última generación"
+                    expandable="false">
+                    <content>
+                        <VBox id="generationResultBox" visible="{app>/hasGenerationResult}">
+                            <ObjectStatus
+                                id="generationStatus"
+                                text="{app>/generationMessage}"
+                                state="Success"
+                                class="sapUiSmallMarginBottom" />
+
+                            <Link
+                                id="downloadDocxLink"
+                                text="{app>/lastGeneration/docxText}"
+                                href="{app>/lastGeneration/docxUrl}"
+                                target="_blank" />
+
+                            <Link
+                                id="downloadPdfLink"
+                                text="{app>/lastGeneration/pdfText}"
+                                href="{app>/lastGeneration/pdfUrl}"
+                                target="_blank" />
+
+                            <Link
+                                id="downloadMetadataLink"
+                                text="{app>/lastGeneration/metadataText}"
+                                href="{app>/lastGeneration/metadataUrl}"
+                                target="_blank" />
+                        </VBox>
+
+                        <Text
+                            id="noGenerationText"
+                            visible="{= !${app>/hasGenerationResult} }"
+                            text="Todavía no se ha generado ningún documento desde la aplicación." />
+                    </content>
+                </Panel>
+
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>

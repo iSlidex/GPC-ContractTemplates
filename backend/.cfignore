@@ -1,0 +1,6 @@
+node_modules
+output/generated/*.docx
+output/generated/*.pdf
+*.docx
+*.pdf
+.env

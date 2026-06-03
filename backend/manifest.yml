@@ -1,0 +1,12 @@
+applications:
+  - name: gpc-contract-flow-poc
+    memory: 256M
+    disk_quota: 512M
+    instances: 1
+    buildpacks:
+      - nodejs_buildpack
+    command: npm start
+    random-route: true
+    env:
+      NODE_ENV: production
+      WEBHOOK_SECRET: gpc-demo-secret
