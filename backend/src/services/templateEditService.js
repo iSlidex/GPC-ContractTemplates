@@ -1,3 +1,6 @@
+const HTMLtoDOCXModule = require("html-to-docx");
+const HTMLtoDOCX = HTMLtoDOCXModule.default || HTMLtoDOCXModule;
+
 const fs = require("fs");
 const path = require("path");
 const mammoth = require("mammoth");
@@ -218,7 +221,90 @@ async function saveHtmlDraftVersion({ sourcePath, html, status = "BORRADOR" }) {
   };
 }
 
+async function saveHtmlDocxVersion({ sourcePath, html, status = "BORRADOR" }) {
+  const sourceInfo = getFileInfo(sourcePath);
+  const documentInfo = parseRepositoryDocumentName(sourceInfo.fileName);
+
+  const normalizedStatus = String(status || "BORRADOR")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+
+  let desiredFileName;
+
+  if (documentInfo.documentKind === "template") {
+    const nextVersion = getNextTemplateVersion({
+      directory: sourceInfo.directory,
+      category: documentInfo.category,
+      contractType: documentInfo.contractType
+    });
+
+    desiredFileName = `TPL_${documentInfo.category}_${documentInfo.contractType}_${nextVersion}_${normalizedStatus}.docx`;
+  } else {
+    desiredFileName =
+      `CTR_${documentInfo.contractNumber}_${documentInfo.category}_${documentInfo.contractType}_${documentInfo.version}_EDITADO_${normalizedStatus}.docx`;
+  }
+
+  const uniqueFile = buildUniqueFilePath(sourceInfo.directory, desiredFileName);
+
+  const fullHtmlDocument = [
+    "<!DOCTYPE html>",
+    "<html>",
+    "<head>",
+    '  <meta charset="utf-8">',
+    "  <style>",
+    "    body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.45; }",
+    "    h1, h2, h3 { font-weight: bold; }",
+    "    p { margin: 0 0 10px 0; }",
+    "    section { margin-top: 12px; }",
+    "  </style>",
+    "</head>",
+    "<body>",
+    html || "",
+    "</body>",
+    "</html>"
+  ].join("\n");
+
+  const buffer = await HTMLtoDOCX(
+    fullHtmlDocument,
+    null,
+    {
+      table: { row: { cantSplit: true } },
+      footer: false,
+      pageNumber: false,
+      margins: {
+        top: 1440,
+        right: 1440,
+        bottom: 1440,
+        left: 1440
+      }
+    }
+  );
+
+  fs.writeFileSync(uniqueFile.fullPath, buffer);
+
+  const relativePath = path.relative(REPO_ROOT, uniqueFile.fullPath);
+
+  return {
+    message:
+      documentInfo.documentKind === "template"
+        ? "Nueva versión Word de plantilla guardada correctamente"
+        : "Copia Word editada del documento generada correctamente",
+    file: {
+      name: uniqueFile.fileName,
+      relativePath,
+      category: documentInfo.category,
+      contractType: documentInfo.contractType,
+      version: documentInfo.version,
+      status: normalizedStatus,
+      documentKind: documentInfo.documentKind,
+      extension: ".docx"
+    }
+  };
+}
+
 module.exports = {
   getEditableHtml,
-  saveHtmlDraftVersion
+  saveHtmlDraftVersion,
+  saveHtmlDocxVersion
 };

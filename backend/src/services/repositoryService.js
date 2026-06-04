@@ -50,42 +50,12 @@ function walkFiles(dirPath, basePath = dirPath) {
         relativePath,
         size: stat.size,
         modifiedAt: stat.mtime.toISOString(),
-        extension: path.extname(entry.name)
+        extension: path.extname(entry.name).toLowerCase()
       });
     }
   }
 
   return result;
-}
-
-function parseTemplateFile(file) {
-  const baseName = path.basename(file.name, ".docx");
-
-  const match = baseName.match(/^TPL_([^_]+)_(.+)_(v\d+)_([^_]+)$/);
-
-  if (!match) {
-    return {
-      templateId: baseName,
-      name: file.name,
-      category: "Sin categoría",
-      contractType: baseName,
-      version: "v000",
-      status: "DESCONOCIDO",
-      relativePath: file.relativePath,
-      modifiedAt: file.modifiedAt
-    };
-  }
-
-  return {
-    templateId: baseName,
-    name: file.name,
-    category: match[1],
-    contractType: match[2],
-    version: match[3],
-    status: match[4],
-    relativePath: file.relativePath,
-    modifiedAt: file.modifiedAt
-  };
 }
 
 function flattenTree(nodes, result = []) {
@@ -98,6 +68,39 @@ function flattenTree(nodes, result = []) {
   }
 
   return result;
+}
+
+function parseTemplateFile(file) {
+  const extension = path.extname(file.name).toLowerCase();
+  const baseName = path.basename(file.name, extension);
+
+  const match = baseName.match(/^TPL_([^_]+)_(.+)_(v\d+)_([^_]+)$/);
+
+  if (!match) {
+    return {
+      templateId: baseName,
+      name: file.name,
+      category: "SIN_CATEGORIA",
+      contractType: baseName,
+      version: "v000",
+      status: "DESCONOCIDO",
+      extension,
+      relativePath: file.relativePath,
+      modifiedAt: file.modifiedAt
+    };
+  }
+
+  return {
+    templateId: baseName,
+    name: file.name,
+    category: match[1],
+    contractType: match[2],
+    version: match[3],
+    status: match[4],
+    extension,
+    relativePath: file.relativePath,
+    modifiedAt: file.modifiedAt
+  };
 }
 
 function getRepositoryTree() {
@@ -115,8 +118,18 @@ function getTemplates() {
   const flat = flattenTree(tree);
 
   return flat
-    .filter((item) => item.type === "file" && item.name.endsWith(".docx"))
-    .map(parseTemplateFile);
+    .filter((item) => {
+      return (
+        item.type === "file" &&
+        [".docx", ".html"].includes(item.extension)
+      );
+    })
+    .map(parseTemplateFile)
+    .sort((a, b) => {
+      if (a.category !== b.category) return a.category.localeCompare(b.category);
+      if (a.contractType !== b.contractType) return a.contractType.localeCompare(b.contractType);
+      return b.version.localeCompare(a.version);
+    });
 }
 
 function getTemplateById(templateId) {
@@ -145,56 +158,6 @@ function labelFromVariable(variableName) {
     .join(" ");
 }
 
-function extractTemplateVariables(templateId) {
-  const template = getTemplateById(templateId);
-  const templatePath = getTemplateAbsolutePath(template);
-
-  const content = fs.readFileSync(templatePath, "binary");
-  const zip = new PizZip(content);
-
-  let fullText = "";
-
-  try {
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true
-    });
-
-    fullText = doc.getFullText();
-  } catch (error) {
-    // Fallback simple: leer XML interno del DOCX
-    const xmlFiles = Object.keys(zip.files).filter((fileName) => {
-      return fileName.startsWith("word/") && fileName.endsWith(".xml");
-    });
-
-    fullText = xmlFiles
-      .map((fileName) => zip.files[fileName].asText())
-      .join("\n");
-  }
-
-  const regex = /\{([A-Za-z0-9_]+)\}/g;
-  const variablesSet = new Set();
-  let match;
-
-  while ((match = regex.exec(fullText)) !== null) {
-    variablesSet.add(match[1]);
-  }
-
-  const variables = Array.from(variablesSet)
-    .sort()
-    .map((name) => ({
-      name,
-      label: labelFromVariable(name),
-      required: true,
-      type: inferVariableType(name)
-    }));
-
-  return {
-    template,
-    variables
-  };
-}
-
 function inferVariableType(variableName) {
   if (variableName.includes("DATE") || variableName.includes("FECHA")) {
     return "date";
@@ -215,10 +178,92 @@ function inferVariableType(variableName) {
   return "text";
 }
 
-function renderDocxFromTemplate({ templateId, contractNumber, values }) {
+function extractVariablesFromText(fullText) {
+  const regex = /\{([A-Za-z0-9_]+)\}/g;
+  const variablesSet = new Set();
+  let match;
+
+  while ((match = regex.exec(fullText)) !== null) {
+    variablesSet.add(match[1]);
+  }
+
+  return Array.from(variablesSet)
+    .sort()
+    .map((name) => ({
+      name,
+      label: labelFromVariable(name),
+      required: true,
+      type: inferVariableType(name)
+    }));
+}
+
+function extractTemplateVariables(templateId) {
   const template = getTemplateById(templateId);
   const templatePath = getTemplateAbsolutePath(template);
 
+  let fullText = "";
+
+  if (template.extension === ".html") {
+    fullText = fs.readFileSync(templatePath, "utf8");
+  } else if (template.extension === ".docx") {
+    const content = fs.readFileSync(templatePath, "binary");
+    const zip = new PizZip(content);
+
+    try {
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true
+      });
+
+      fullText = doc.getFullText();
+    } catch (error) {
+      const xmlFiles = Object.keys(zip.files).filter((fileName) => {
+        return fileName.startsWith("word/") && fileName.endsWith(".xml");
+      });
+
+      fullText = xmlFiles
+        .map((fileName) => zip.files[fileName].asText())
+        .join("\n");
+    }
+  } else {
+    const error = new Error("Tipo de plantilla no soportado para extracción de variables");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    template,
+    variables: extractVariablesFromText(fullText)
+  };
+}
+
+function renderStringTemplate(content, values) {
+  let rendered = content;
+
+  Object.entries(values).forEach(([key, value]) => {
+    const regex = new RegExp("\\{" + key + "\\}", "g");
+    rendered = rendered.replace(regex, value || "");
+  });
+
+  return rendered;
+}
+
+function stripHtml(html) {
+  return String(html || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|tr)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function renderDocxFromTemplate({ template, templatePath, contractNumber, values }) {
   const category = template.category;
   const contractType = template.contractType;
   const version = template.version;
@@ -244,13 +289,37 @@ function renderDocxFromTemplate({ templateId, contractNumber, values }) {
   return {
     fileName: outputFileName,
     absolutePath: outputPath,
-    relativePath: path.relative(REPO_ROOT, outputPath)
+    relativePath: path.relative(REPO_ROOT, outputPath),
+    extension: ".docx"
   };
 }
 
-function generatePdfFromValues({ templateId, contractNumber, values }) {
-  const template = getTemplateById(templateId);
+function renderHtmlFromTemplate({ template, templatePath, contractNumber, values }) {
+  const category = template.category;
+  const contractType = template.contractType;
+  const version = template.version;
 
+  const outputDir = path.join(REPO_ROOT, "generated", "html", category);
+  ensureDir(outputDir);
+
+  const outputFileName = `CTR_${contractNumber}_${category}_${contractType}_${version}_GENERADO.html`;
+  const outputPath = path.join(outputDir, outputFileName);
+
+  const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+  const renderedHtml = renderStringTemplate(htmlTemplate, values);
+
+  fs.writeFileSync(outputPath, renderedHtml, "utf8");
+
+  return {
+    fileName: outputFileName,
+    absolutePath: outputPath,
+    relativePath: path.relative(REPO_ROOT, outputPath),
+    extension: ".html",
+    renderedHtml
+  };
+}
+
+function generatePdfFromRenderedContent({ template, contractNumber, renderedContent, values }) {
   const category = template.category;
   const contractType = template.contractType;
   const version = template.version;
@@ -275,20 +344,27 @@ function generatePdfFromValues({ templateId, contractNumber, values }) {
 
   doc.moveDown(2);
 
-  doc.fontSize(11).text(`Número de contrato: ${contractNumber}`);
+  doc.fontSize(10).text(`Número de contrato: ${contractNumber}`);
   doc.text(`Tipo de contrato: ${contractType}`);
   doc.text(`Categoría: ${category}`);
   doc.text(`Versión de plantilla: ${version}`);
 
   doc.moveDown();
 
-  doc.font("Helvetica-Bold").text("Datos usados para generar el documento:");
-  doc.font("Helvetica");
+  if (renderedContent) {
+    doc.fontSize(11).text(stripHtml(renderedContent), {
+      align: "justify",
+      lineGap: 4
+    });
+  } else {
+    doc.font("Helvetica-Bold").text("Datos usados para generar el documento:");
+    doc.font("Helvetica");
 
-  Object.entries(values).forEach(([key, value]) => {
-    doc.moveDown(0.5);
-    doc.text(`${key}: ${value || ""}`);
-  });
+    Object.entries(values).forEach(([key, value]) => {
+      doc.moveDown(0.5);
+      doc.text(`${key}: ${value || ""}`);
+    });
+  }
 
   doc.moveDown(4);
 
@@ -307,7 +383,8 @@ function generatePdfFromValues({ templateId, contractNumber, values }) {
       resolve({
         fileName: outputFileName,
         absolutePath: outputPath,
-        relativePath: path.relative(REPO_ROOT, outputPath)
+        relativePath: path.relative(REPO_ROOT, outputPath),
+        extension: ".pdf"
       });
     });
 
@@ -317,6 +394,8 @@ function generatePdfFromValues({ templateId, contractNumber, values }) {
 
 async function generateContractDocuments({ templateId, contractNumber, values }) {
   const variablesInfo = extractTemplateVariables(templateId);
+  const template = variablesInfo.template;
+  const templatePath = getTemplateAbsolutePath(template);
 
   const normalizedValues = {};
 
@@ -324,27 +403,50 @@ async function generateContractDocuments({ templateId, contractNumber, values })
     normalizedValues[variable.name] = values[variable.name] || "";
   });
 
-  const docx = renderDocxFromTemplate({
-    templateId,
-    contractNumber,
-    values: normalizedValues
-  });
+  let generatedDocument;
+  let renderedContent = "";
 
-  const pdf = await generatePdfFromValues({
-    templateId,
+  if (template.extension === ".docx") {
+    generatedDocument = renderDocxFromTemplate({
+      template,
+      templatePath,
+      contractNumber,
+      values: normalizedValues
+    });
+
+    renderedContent = null;
+  } else if (template.extension === ".html") {
+    generatedDocument = renderHtmlFromTemplate({
+      template,
+      templatePath,
+      contractNumber,
+      values: normalizedValues
+    });
+
+    renderedContent = generatedDocument.renderedHtml;
+    delete generatedDocument.renderedHtml;
+  } else {
+    const error = new Error("Tipo de plantilla no soportado para generación");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const pdf = await generatePdfFromRenderedContent({
+    template,
     contractNumber,
+    renderedContent,
     values: normalizedValues
   });
 
   const metadata = {
     contractNumber,
     templateId,
-    template: variablesInfo.template,
+    template,
     variables: variablesInfo.variables,
     values: normalizedValues,
     generatedAt: new Date().toISOString(),
     files: {
-      docx,
+      document: generatedDocument,
       pdf
     }
   };
@@ -359,12 +461,14 @@ async function generateContractDocuments({ templateId, contractNumber, values })
 
   return {
     metadata,
-    docx,
+    document: generatedDocument,
+    docx: generatedDocument,
     pdf,
     metadataFile: {
       fileName: metadataFileName,
       absolutePath: metadataPath,
-      relativePath: path.relative(REPO_ROOT, metadataPath)
+      relativePath: path.relative(REPO_ROOT, metadataPath),
+      extension: ".json"
     }
   };
 }

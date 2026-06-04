@@ -8,7 +8,8 @@ const {
 
 const {
   getEditableHtml,
-  saveHtmlDraftVersion
+  saveHtmlDraftVersion,
+  saveHtmlDocxVersion
 } = require("../services/templateEditService");
 
 const {
@@ -217,6 +218,28 @@ router.get("/clauses/:clauseId", (req, res, next) => {
     res.json({
       clause
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/files/edit/docx-version", async (req, res, next) => {
+  try {
+    const { sourcePath, html, status } = req.body;
+
+    if (!sourcePath) {
+      return res.status(400).json({
+        error: "Falta sourcePath"
+      });
+    }
+
+    const result = await saveHtmlDocxVersion({
+      sourcePath,
+      html,
+      status: status || "BORRADOR"
+    });
+
+    res.json(result);
   } catch (error) {
     next(error);
   }

@@ -699,11 +699,18 @@ sap.ui.define([
             const oModel = this.getView().getModel("app");
             const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
 
+            const sDocumentFileName =
+                oResult.result &&
+                    oResult.result.document &&
+                    oResult.result.document.fileName
+                    ? oResult.result.document.fileName
+                    : "documento generado";
+
             oModel.setProperty("/hasGenerationResult", true);
             oModel.setProperty("/generationMessage", oResult.message || "Documentos generados correctamente");
 
             oModel.setProperty("/lastGeneration", {
-                docxText: "Descargar DOCX generado",
+                docxText: "Descargar documento generado: " + sDocumentFileName,
                 docxUrl: sApiBaseUrl + oResult.downloadUrls.docx,
                 pdfText: "Descargar PDF para firma",
                 pdfUrl: sApiBaseUrl + oResult.downloadUrls.pdf,
@@ -729,7 +736,7 @@ sap.ui.define([
                             }).addStyleClass("sapUiSmallMarginBottom"),
 
                             new Link({
-                                text: "Abrir DOCX generado",
+                                text: "Abrir documento generado",
                                 href: sApiBaseUrl + oResult.downloadUrls.docx,
                                 target: "_blank"
                             }),
@@ -861,7 +868,7 @@ sap.ui.define([
                     "<button type='button' data-editor-command='ol' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Numerada</button>" +
                     "<button type='button' data-editor-command='hr' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Separador</button>" +
                     "<button type='button' data-editor-command='clear' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Limpiar formato</button>" +
-
+                    "<button type='button' data-editor-action='save-docx' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;border:1px solid #0a6ed1;background:#0a6ed1;color:white;border-radius:0.35rem;'>Guardar como Word</button>" +
                     "</div>" +
 
                     "<div id='" + sEditorId + "' " +
@@ -936,9 +943,15 @@ sap.ui.define([
                         }.bind(this));
                     }
 
-                    const aCommandButtons = document.querySelectorAll(
-                        "button[data-editor-command][data-editor-id='" + sEditorId + "']"
+                    const oSaveDocxButton = document.querySelector(
+                        "button[data-editor-action='save-docx'][data-editor-id='" + sEditorId + "']"
                     );
+
+                    if (oSaveDocxButton) {
+                        oSaveDocxButton.addEventListener("click", async function () {
+                            await this._saveHtmlDocxVersion(oItem, sEditorId, oDialog);
+                        }.bind(this));
+                    }
 
                     aCommandButtons.forEach(function (oButton) {
                         oButton.addEventListener("click", function () {
@@ -1211,6 +1224,53 @@ sap.ui.define([
             });
 
             oDialog.open();
+        },
+
+        _saveHtmlDocxVersion: async function (oItem, sEditorId, oDialog) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+            const oEditor = document.getElementById(sEditorId);
+
+            if (!oEditor) {
+                MessageBox.error("No se encontró el editor HTML en pantalla.");
+                return;
+            }
+
+            const sEditedHtml = oEditor.innerHTML;
+
+            try {
+                oDialog.setBusy(true);
+
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl + "/api/files/edit/docx-version",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            sourcePath: oItem.relativePath,
+                            html: sEditedHtml,
+                            status: "BORRADOR"
+                        })
+                    }
+                );
+
+                oDialog.setBusy(false);
+
+                MessageToast.show(oResult.message || "Nueva versión Word guardada");
+
+                await this._refreshRepositoryAfterGeneration();
+
+                MessageBox.success(
+                    "Nueva versión Word creada:\n\n" +
+                    oResult.file.name +
+                    "\n\nRuta:\n" +
+                    oResult.file.relativePath
+                );
+            } catch (oError) {
+                oDialog.setBusy(false);
+                MessageBox.error("No se pudo guardar como Word:\n\n" + oError.message);
+            }
         },
 
         _escapeHtml: function (sValue) {
