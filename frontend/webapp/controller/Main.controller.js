@@ -765,32 +765,75 @@ sap.ui.define([
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
 
             try {
-                const oResult = await this._fetchJson(
-                    sApiBaseUrl +
-                    "/api/files/edit/html?path=" +
-                    encodeURIComponent(oItem.relativePath)
-                );
+                const [oEditableResult, oClausesResult] = await Promise.all([
+                    this._fetchJson(
+                        sApiBaseUrl +
+                        "/api/files/edit/html?path=" +
+                        encodeURIComponent(oItem.relativePath)
+                    ),
+                    this._fetchJson(
+                        sApiBaseUrl +
+                        "/api/clauses?includeHtml=true"
+                    )
+                ]);
 
-                this._openHtmlEditorDialog(oItem, oResult.html);
+                this._openHtmlEditorDialog(
+                    oItem,
+                    oEditableResult.html,
+                    oClausesResult.clauses || []
+                );
             } catch (oError) {
                 MessageBox.error("No se pudo abrir el editor HTML:\n\n" + oError.message);
             }
         },
 
-        _openHtmlEditorDialog: function (oItem, sHtmlContent) {
+        _openHtmlEditorDialog: function (oItem, sHtmlContent, aClauses) {
             const sEditorId = "gpcHtmlEditor_" + Date.now();
+
+            const mClausesById = {};
+            const sClausesHtml = (aClauses || []).map(function (oClause) {
+                mClausesById[oClause.clauseId] = oClause;
+
+                return [
+                    "<div style='border:1px solid #d9e2ec;border-radius:0.5rem;padding:0.75rem;margin-bottom:0.75rem;background:#fff;'>",
+                    "<div style='font-weight:bold;margin-bottom:0.25rem;'>",
+                    this._escapeHtml(oClause.title),
+                    "</div>",
+                    "<div style='font-size:0.8rem;color:#556b82;margin-bottom:0.5rem;'>",
+                    this._escapeHtml(oClause.category),
+                    " · ",
+                    this._escapeHtml(oClause.version),
+                    " · ",
+                    this._escapeHtml(oClause.status),
+                    "</div>",
+                    "<button type='button' ",
+                    "data-clause-id='",
+                    this._escapeHtml(oClause.clauseId),
+                    "' ",
+                    "data-editor-id='",
+                    this._escapeHtml(sEditorId),
+                    "' ",
+                    "style='padding:0.35rem 0.6rem;border-radius:0.35rem;border:1px solid #0a6ed1;background:#0a6ed1;color:white;cursor:pointer;'>",
+                    "Insertar cláusula",
+                    "</button>",
+                    "</div>"
+                ].join("");
+            }.bind(this)).join("");
 
             const oHtml = new HTML({
                 sanitizeContent: false,
                 content:
-                    "<div style='padding:1rem;height:60vh;box-sizing:border-box;'>" +
+                    "<div style='display:flex;gap:1rem;padding:1rem;height:68vh;box-sizing:border-box;'>" +
+
+                    "<div style='flex:1;display:flex;flex-direction:column;min-width:0;'>" +
                     "<div style='margin-bottom:0.75rem;color:#556b82;'>" +
                     "Editando una representación HTML del documento. Al guardar se creará una nueva versión BORRADOR en el repositorio." +
                     "</div>" +
                     "<div id='" + sEditorId + "' " +
                     "contenteditable='true' " +
                     "style='" +
-                    "min-height:52vh;" +
+                    "flex:1;" +
+                    "min-height:56vh;" +
                     "border:1px solid #c9d2dc;" +
                     "border-radius:0.5rem;" +
                     "padding:1rem;" +
@@ -799,13 +842,21 @@ sap.ui.define([
                     "font-family:Arial, sans-serif;" +
                     "line-height:1.5;" +
                     "'></div>" +
+                    "</div>" +
+
+                    "<div style='width:340px;border-left:1px solid #d9e2ec;padding-left:1rem;overflow:auto;'>" +
+                    "<h3 style='margin-top:0;'>Repositorio de cláusulas</h3>" +
+                    "<p style='font-size:0.85rem;color:#556b82;'>Selecciona una cláusula aprobada para insertarla al final del documento editado.</p>" +
+                    (sClausesHtml || "<p>No hay cláusulas disponibles.</p>") +
+                    "</div>" +
+
                     "</div>"
             });
 
             const oDialog = new Dialog({
                 title: "Editor HTML - " + oItem.name,
-                contentWidth: "90%",
-                contentHeight: "80%",
+                contentWidth: "95%",
+                contentHeight: "88%",
                 verticalScrolling: false,
                 resizable: true,
                 draggable: true,
@@ -829,7 +880,35 @@ sap.ui.define([
                     if (oEditor) {
                         oEditor.innerHTML = sHtmlContent || "<p>Sin contenido para editar.</p>";
                     }
-                },
+
+                    const aButtons = document.querySelectorAll(
+                        "button[data-editor-id='" + sEditorId + "'][data-clause-id]"
+                    );
+
+                    aButtons.forEach(function (oButton) {
+                        oButton.addEventListener("click", function () {
+                            const sClauseId = oButton.getAttribute("data-clause-id");
+                            const oClause = mClausesById[sClauseId];
+
+                            if (!oClause || !oEditor) {
+                                return;
+                            }
+
+                            const sClauseHtml = [
+                                "<hr>",
+                                "<section data-clause-id='",
+                                this._escapeHtml(oClause.clauseId),
+                                "'>",
+                                oClause.html,
+                                "</section>"
+                            ].join("");
+
+                            oEditor.innerHTML = oEditor.innerHTML + sClauseHtml;
+
+                            MessageToast.show("Cláusula insertada: " + oClause.title);
+                        }.bind(this));
+                    }.bind(this));
+                }.bind(this),
                 afterClose: function () {
                     oDialog.destroy();
                 }

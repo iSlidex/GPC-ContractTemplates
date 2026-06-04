@@ -2,6 +2,11 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  getClauses,
+  getClauseById
+} = require("../services/clauseService");
+
+const {
   getEditableHtml,
   saveHtmlDraftVersion
 } = require("../services/templateEditService");
@@ -184,6 +189,34 @@ router.post("/files/edit/html-version", async (req, res, next) => {
     });
 
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/clauses", (req, res, next) => {
+  try {
+    const clauses = getClauses({
+      category: req.query.category,
+      status: req.query.status,
+      includeHtml: req.query.includeHtml === "true"
+    });
+
+    res.json({
+      clauses
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/clauses/:clauseId", (req, res, next) => {
+  try {
+    const clause = getClauseById(req.params.clauseId);
+
+    res.json({
+      clause
+    });
   } catch (error) {
     next(error);
   }
