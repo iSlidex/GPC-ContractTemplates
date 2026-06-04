@@ -6,12 +6,12 @@ sap.ui.define([
     "sap/m/Dialog",
     "sap/m/Button",
     "sap/m/VBox",
-    "sap/m/HBox",
     "sap/m/Text",
     "sap/m/Label",
     "sap/m/Input",
     "sap/m/Link",
-    "sap/m/ObjectStatus"
+    "sap/m/ObjectStatus",
+    "sap/ui/core/HTML"
 ], function (
     Controller,
     JSONModel,
@@ -20,12 +20,12 @@ sap.ui.define([
     Dialog,
     Button,
     VBox,
-    HBox,
     Text,
     Label,
     Input,
     Link,
-    ObjectStatus
+    ObjectStatus,
+    HTML
 ) {
     "use strict";
 
@@ -70,11 +70,10 @@ sap.ui.define([
             const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
 
             try {
-                oModel.setProperty("/backendStatus", "Conectando a " + sApiBaseUrl);
+                oModel.setProperty("/backendStatus", "Validando backend...");
                 oModel.setProperty("/backendStatusState", "Warning");
 
-                const [oHealth, oTemplates, oRepository] = await Promise.all([
-                    this._fetchJson(sApiBaseUrl + "/health"),
+                const [oTemplates, oRepository] = await Promise.all([
                     this._fetchJson(sApiBaseUrl + "/api/templates"),
                     this._fetchJson(sApiBaseUrl + "/api/repository")
                 ]);
@@ -94,9 +93,7 @@ sap.ui.define([
                 MessageBox.error(
                     "No se pudo conectar con el backend.\n\n" +
                     "URL usada:\n" + sApiBaseUrl + "\n\n" +
-                    "Detalle:\n" + oError.message + "\n\n" +
-                    "Si el backend está en otro Dev Space, define la URL manualmente en la consola del navegador:\n\n" +
-                    "localStorage.setItem('GPC_API_BASE_URL', 'https://port4000-...applicationstudio.cloud.sap')"
+                    "Detalle:\n" + oError.message
                 );
             }
         },
@@ -141,12 +138,24 @@ sap.ui.define([
             }
         },
 
-        _getTemplateFromEvent: function (oEvent) {
-            let oContext = oEvent.getSource().getBindingContext("app");
+        _getContextFromEvent: function (oEvent) {
+            let oControl = oEvent.getSource();
 
-            if (!oContext && oEvent.getSource().getParent) {
-                oContext = oEvent.getSource().getParent().getBindingContext("app");
+            while (oControl) {
+                const oContext = oControl.getBindingContext("app");
+
+                if (oContext) {
+                    return oContext;
+                }
+
+                oControl = oControl.getParent && oControl.getParent();
             }
+
+            return null;
+        },
+
+        _getTemplateFromEvent: function (oEvent) {
+            const oContext = this._getContextFromEvent(oEvent);
 
             if (!oContext) {
                 throw new Error("No se pudo obtener el contexto de la plantilla");
@@ -167,7 +176,6 @@ sap.ui.define([
             }
 
             const oItem = oContext.getObject();
-            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
 
             if (oItem.type === "folder") {
                 MessageBox.information(
@@ -177,10 +185,6 @@ sap.ui.define([
                 return;
             }
 
-            const sDownloadUrl = sApiBaseUrl +
-                "/api/files/download?path=" +
-                encodeURIComponent(oItem.relativePath);
-
             MessageBox.information(
                 "Archivo del repositorio:\n\n" +
                 oItem.name +
@@ -189,14 +193,186 @@ sap.ui.define([
                 "\n\nModificado:\n" +
                 (oItem.modifiedAt || "N/D"),
                 {
-                    actions: ["Descargar", MessageBox.Action.CLOSE],
+                    actions: ["Vista previa", "Descargar", MessageBox.Action.CLOSE],
+                    emphasizedAction: "Vista previa",
                     onClose: function (sAction) {
-                        if (sAction === "Descargar") {
-                            window.open(sDownloadUrl, "_blank");
+                        if (sAction === "Vista previa") {
+                            this._previewRepositoryFile(oItem);
                         }
-                    }
+
+                        if (sAction === "Descargar") {
+                            this._downloadRepositoryFile(oItem);
+                        }
+                    }.bind(this)
                 }
             );
+        },
+
+        _downloadRepositoryFile: function (oItem) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+
+            const sDownloadUrl =
+                sApiBaseUrl +
+                "/api/files/download?path=" +
+                encodeURIComponent(oItem.relativePath);
+
+            window.open(sDownloadUrl, "_blank");
+        },
+
+        _previewRepositoryFile: async function (oItem) {
+            const sExtension = (oItem.extension || "").toLowerCase();
+
+            if (sExtension === ".pdf") {
+                this._previewPdf(oItem);
+                return;
+            }
+
+            if (sExtension === ".docx") {
+                await this._previewDocx(oItem);
+                return;
+            }
+
+            if ([".json", ".txt", ".xml", ".csv", ".md"].includes(sExtension)) {
+                await this._previewTextFile(oItem);
+                return;
+            }
+
+            MessageBox.information(
+                "No hay vista previa disponible para este tipo de archivo.\n\n" +
+                "Archivo: " + oItem.name
+            );
+        },
+
+        _previewPdf: function (oItem) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+
+            const sInlineUrl =
+                sApiBaseUrl +
+                "/api/files/inline?path=" +
+                encodeURIComponent(oItem.relativePath);
+
+            const oHtml = new HTML({
+                content:
+                    "<iframe " +
+                    "src='" + sInlineUrl + "' " +
+                    "style='width:100%;height:70vh;border:0;'>" +
+                    "</iframe>"
+            });
+
+            const oDialog = new Dialog({
+                title: "Vista previa PDF - " + oItem.name,
+                contentWidth: "90%",
+                contentHeight: "80%",
+                resizable: true,
+                draggable: true,
+                content: [oHtml],
+                endButton: new Button({
+                    text: "Cerrar",
+                    press: function () {
+                        oDialog.close();
+                    }
+                }),
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
+
+        _previewDocx: async function (oItem) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+
+            try {
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl +
+                    "/api/files/preview/docx?path=" +
+                    encodeURIComponent(oItem.relativePath)
+                );
+
+                const sHtml =
+                    "<div style='padding:1rem;font-family:Arial, sans-serif;line-height:1.5;'>" +
+                    "<h3>" + this._escapeHtml(oItem.name) + "</h3>" +
+                    oResult.html +
+                    "</div>";
+
+                const oHtml = new HTML({
+                    content: sHtml
+                });
+
+                const oDialog = new Dialog({
+                    title: "Vista previa DOCX",
+                    contentWidth: "900px",
+                    contentHeight: "700px",
+                    verticalScrolling: true,
+                    resizable: true,
+                    draggable: true,
+                    content: [oHtml],
+                    beginButton: new Button({
+                        text: "Descargar",
+                        press: function () {
+                            this._downloadRepositoryFile(oItem);
+                        }.bind(this)
+                    }),
+                    endButton: new Button({
+                        text: "Cerrar",
+                        press: function () {
+                            oDialog.close();
+                        }
+                    }),
+                    afterClose: function () {
+                        oDialog.destroy();
+                    }
+                });
+
+                oDialog.open();
+            } catch (oError) {
+                MessageBox.error("No se pudo previsualizar el DOCX:\n\n" + oError.message);
+            }
+        },
+
+        _previewTextFile: async function (oItem) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+
+            try {
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl +
+                    "/api/files/preview/text?path=" +
+                    encodeURIComponent(oItem.relativePath)
+                );
+
+                const sText = this._escapeHtml(oResult.text);
+
+                const oHtml = new HTML({
+                    content:
+                        "<pre style='padding:1rem;white-space:pre-wrap;font-family:monospace;'>" +
+                        sText +
+                        "</pre>"
+                });
+
+                const oDialog = new Dialog({
+                    title: "Vista previa - " + oItem.name,
+                    contentWidth: "900px",
+                    contentHeight: "700px",
+                    verticalScrolling: true,
+                    resizable: true,
+                    draggable: true,
+                    content: [oHtml],
+                    endButton: new Button({
+                        text: "Cerrar",
+                        press: function () {
+                            oDialog.close();
+                        }
+                    }),
+                    afterClose: function () {
+                        oDialog.destroy();
+                    }
+                });
+
+                oDialog.open();
+            } catch (oError) {
+                MessageBox.error("No se pudo previsualizar el archivo:\n\n" + oError.message);
+            }
         },
 
         onShowVariables: async function (oEvent) {
@@ -424,10 +600,7 @@ sap.ui.define([
                 oModel.setProperty("/backendStatusState", "Success");
             } catch (oError) {
                 console.warn("No se pudo refrescar el repositorio después de generar:", oError);
-
-                MessageToast.show(
-                    "Documentos generados. No se pudo refrescar el árbol automáticamente."
-                );
+                MessageToast.show("Documentos generados. No se pudo refrescar el árbol automáticamente.");
             }
         },
 
@@ -496,6 +669,15 @@ sap.ui.define([
             });
 
             oDialog.open();
+        },
+
+        _escapeHtml: function (sValue) {
+            return String(sValue || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
     });
 });

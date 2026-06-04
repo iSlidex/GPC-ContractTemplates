@@ -9,6 +9,12 @@ const {
   getFileForDownload
 } = require("../services/repositoryService");
 
+const {
+  getFileInfo,
+  previewDocxAsHtml,
+  readTextFile
+} = require("../services/filePreviewService");
+
 router.get("/repository", (req, res, next) => {
   try {
     res.json(getRepositoryTree());
@@ -73,6 +79,66 @@ router.get("/files/download", (req, res, next) => {
     const fullPath = getFileForDownload(relativePath);
 
     res.download(fullPath);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/files/inline", (req, res, next) => {
+  try {
+    const relativePath = req.query.path;
+
+    if (!relativePath) {
+      return res.status(400).json({
+        error: "Falta query parameter path"
+      });
+    }
+
+    const fileInfo = getFileInfo(relativePath);
+
+    res.setHeader("Content-Type", fileInfo.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${encodeURIComponent(fileInfo.fileName)}"`
+    );
+
+    res.sendFile(fileInfo.fullPath);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/files/preview/docx", async (req, res, next) => {
+  try {
+    const relativePath = req.query.path;
+
+    if (!relativePath) {
+      return res.status(400).json({
+        error: "Falta query parameter path"
+      });
+    }
+
+    const result = await previewDocxAsHtml(relativePath);
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/files/preview/text", (req, res, next) => {
+  try {
+    const relativePath = req.query.path;
+
+    if (!relativePath) {
+      return res.status(400).json({
+        error: "Falta query parameter path"
+      });
+    }
+
+    const result = readTextFile(relativePath);
+
+    res.json(result);
   } catch (error) {
     next(error);
   }
