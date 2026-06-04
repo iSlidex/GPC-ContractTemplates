@@ -2,6 +2,11 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  getEditableHtml,
+  saveHtmlDraftVersion
+} = require("../services/templateEditService");
+
+const {
   getRepositoryTree,
   getTemplates,
   extractTemplateVariables,
@@ -137,6 +142,46 @@ router.get("/files/preview/text", (req, res, next) => {
     }
 
     const result = readTextFile(relativePath);
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/files/edit/html", async (req, res, next) => {
+  try {
+    const relativePath = req.query.path;
+
+    if (!relativePath) {
+      return res.status(400).json({
+        error: "Falta query parameter path"
+      });
+    }
+
+    const result = await getEditableHtml(relativePath);
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/files/edit/html-version", async (req, res, next) => {
+  try {
+    const { sourcePath, html, status } = req.body;
+
+    if (!sourcePath) {
+      return res.status(400).json({
+        error: "Falta sourcePath"
+      });
+    }
+
+    const result = await saveHtmlDraftVersion({
+      sourcePath,
+      html,
+      status: status || "BORRADOR"
+    });
 
     res.json(result);
   } catch (error) {

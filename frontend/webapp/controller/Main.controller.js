@@ -133,6 +133,8 @@ sap.ui.define([
                     return "sap-icon://attachment-text-file";
                 case ".xlsx":
                     return "sap-icon://excel-attachment";
+                case ".html":
+                    return "sap-icon://source-code";
                 default:
                     return "sap-icon://document";
             }
@@ -185,6 +187,16 @@ sap.ui.define([
                 return;
             }
 
+            const sExtension = (oItem.extension || "").toLowerCase();
+
+            const aActions = ["Vista previa"];
+
+            if (sExtension === ".docx" || sExtension === ".html") {
+                aActions.push("Editar HTML");
+            }
+
+            aActions.push("Descargar", MessageBox.Action.CLOSE);
+
             MessageBox.information(
                 "Archivo del repositorio:\n\n" +
                 oItem.name +
@@ -193,11 +205,15 @@ sap.ui.define([
                 "\n\nModificado:\n" +
                 (oItem.modifiedAt || "N/D"),
                 {
-                    actions: ["Vista previa", "Descargar", MessageBox.Action.CLOSE],
+                    actions: aActions,
                     emphasizedAction: "Vista previa",
                     onClose: function (sAction) {
                         if (sAction === "Vista previa") {
                             this._previewRepositoryFile(oItem);
+                        }
+
+                        if (sAction === "Editar HTML") {
+                            this._editRepositoryFile(oItem);
                         }
 
                         if (sAction === "Descargar") {
@@ -229,6 +245,11 @@ sap.ui.define([
 
             if (sExtension === ".docx") {
                 await this._previewDocx(oItem);
+                return;
+            }
+
+            if (sExtension === ".html") {
+                await this._previewEditableHtml(oItem);
                 return;
             }
 
@@ -280,6 +301,7 @@ sap.ui.define([
             oDialog.open();
         },
 
+
         _previewDocx: async function (oItem) {
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
 
@@ -290,14 +312,15 @@ sap.ui.define([
                     encodeURIComponent(oItem.relativePath)
                 );
 
-                const sHtml =
-                    "<div style='padding:1rem;font-family:Arial, sans-serif;line-height:1.5;'>" +
-                    "<h3>" + this._escapeHtml(oItem.name) + "</h3>" +
-                    oResult.html +
-                    "</div>";
+                const sContentId = "gpcDocxPreview_" + Date.now();
 
                 const oHtml = new HTML({
-                    content: sHtml
+                    sanitizeContent: false,
+                    content:
+                        "<div style='padding:1rem;font-family:Arial, sans-serif;line-height:1.5;'>" +
+                        "<h3>" + this._escapeHtml(oItem.name) + "</h3>" +
+                        "<div id='" + sContentId + "'></div>" +
+                        "</div>"
                 });
 
                 const oDialog = new Dialog({
@@ -320,6 +343,13 @@ sap.ui.define([
                             oDialog.close();
                         }
                     }),
+                    afterOpen: function () {
+                        const oContainer = document.getElementById(sContentId);
+
+                        if (oContainer) {
+                            oContainer.innerHTML = oResult.html || "<p>Sin contenido para mostrar.</p>";
+                        }
+                    },
                     afterClose: function () {
                         oDialog.destroy();
                     }
@@ -328,6 +358,67 @@ sap.ui.define([
                 oDialog.open();
             } catch (oError) {
                 MessageBox.error("No se pudo previsualizar el DOCX:\n\n" + oError.message);
+            }
+        },
+
+        _previewEditableHtml: async function (oItem) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+
+            try {
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl +
+                    "/api/files/edit/html?path=" +
+                    encodeURIComponent(oItem.relativePath)
+                );
+
+                const sContentId = "gpcHtmlPreview_" + Date.now();
+
+                const oHtml = new HTML({
+                    sanitizeContent: false,
+                    content:
+                        "<div style='padding:1rem;font-family:Arial, sans-serif;line-height:1.5;'>" +
+                        "<h3>" + this._escapeHtml(oItem.name) + "</h3>" +
+                        "<div id='" + sContentId + "'></div>" +
+                        "</div>"
+                });
+
+                const oDialog = new Dialog({
+                    title: "Vista previa HTML",
+                    contentWidth: "900px",
+                    contentHeight: "700px",
+                    verticalScrolling: true,
+                    resizable: true,
+                    draggable: true,
+                    content: [oHtml],
+                    beginButton: new Button({
+                        text: "Editar",
+                        type: "Emphasized",
+                        press: function () {
+                            oDialog.close();
+                            this._editRepositoryFile(oItem);
+                        }.bind(this)
+                    }),
+                    endButton: new Button({
+                        text: "Cerrar",
+                        press: function () {
+                            oDialog.close();
+                        }
+                    }),
+                    afterOpen: function () {
+                        const oContainer = document.getElementById(sContentId);
+
+                        if (oContainer) {
+                            oContainer.innerHTML = oResult.html || "<p>Sin contenido para mostrar.</p>";
+                        }
+                    },
+                    afterClose: function () {
+                        oDialog.destroy();
+                    }
+                });
+
+                oDialog.open();
+            } catch (oError) {
+                MessageBox.error("No se pudo previsualizar el HTML:\n\n" + oError.message);
             }
         },
 
@@ -670,7 +761,130 @@ sap.ui.define([
 
             oDialog.open();
         },
+        _editRepositoryFile: async function (oItem) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
 
+            try {
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl +
+                    "/api/files/edit/html?path=" +
+                    encodeURIComponent(oItem.relativePath)
+                );
+
+                this._openHtmlEditorDialog(oItem, oResult.html);
+            } catch (oError) {
+                MessageBox.error("No se pudo abrir el editor HTML:\n\n" + oError.message);
+            }
+        },
+
+        _openHtmlEditorDialog: function (oItem, sHtmlContent) {
+            const sEditorId = "gpcHtmlEditor_" + Date.now();
+
+            const oHtml = new HTML({
+                sanitizeContent: false,
+                content:
+                    "<div style='padding:1rem;height:60vh;box-sizing:border-box;'>" +
+                    "<div style='margin-bottom:0.75rem;color:#556b82;'>" +
+                    "Editando una representación HTML del documento. Al guardar se creará una nueva versión BORRADOR en el repositorio." +
+                    "</div>" +
+                    "<div id='" + sEditorId + "' " +
+                    "contenteditable='true' " +
+                    "style='" +
+                    "min-height:52vh;" +
+                    "border:1px solid #c9d2dc;" +
+                    "border-radius:0.5rem;" +
+                    "padding:1rem;" +
+                    "background:white;" +
+                    "overflow:auto;" +
+                    "font-family:Arial, sans-serif;" +
+                    "line-height:1.5;" +
+                    "'></div>" +
+                    "</div>"
+            });
+
+            const oDialog = new Dialog({
+                title: "Editor HTML - " + oItem.name,
+                contentWidth: "90%",
+                contentHeight: "80%",
+                verticalScrolling: false,
+                resizable: true,
+                draggable: true,
+                content: [oHtml],
+                beginButton: new Button({
+                    text: "Guardar como borrador",
+                    type: "Emphasized",
+                    press: async function () {
+                        await this._saveHtmlDraftVersion(oItem, sEditorId, oDialog);
+                    }.bind(this)
+                }),
+                endButton: new Button({
+                    text: "Cancelar",
+                    press: function () {
+                        oDialog.close();
+                    }
+                }),
+                afterOpen: function () {
+                    const oEditor = document.getElementById(sEditorId);
+
+                    if (oEditor) {
+                        oEditor.innerHTML = sHtmlContent || "<p>Sin contenido para editar.</p>";
+                    }
+                },
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
+
+        _saveHtmlDraftVersion: async function (oItem, sEditorId, oDialog) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+            const oEditor = document.getElementById(sEditorId);
+
+            if (!oEditor) {
+                MessageBox.error("No se encontró el editor HTML en pantalla.");
+                return;
+            }
+
+            const sEditedHtml = oEditor.innerHTML;
+
+            try {
+                oDialog.setBusy(true);
+
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl + "/api/files/edit/html-version",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            sourcePath: oItem.relativePath,
+                            html: sEditedHtml,
+                            status: "BORRADOR"
+                        })
+                    }
+                );
+
+                oDialog.setBusy(false);
+                oDialog.close();
+
+                MessageToast.show(oResult.message || "Nueva versión guardada");
+
+                await this._refreshRepositoryAfterGeneration();
+
+                MessageBox.success(
+                    "Nueva versión creada:\n\n" +
+                    oResult.file.name +
+                    "\n\nRuta:\n" +
+                    oResult.file.relativePath
+                );
+            } catch (oError) {
+                oDialog.setBusy(false);
+                MessageBox.error("No se pudo guardar la nueva versión:\n\n" + oError.message);
+            }
+        },
         _escapeHtml: function (sValue) {
             return String(sValue || "")
                 .replace(/&/g, "&amp;")
