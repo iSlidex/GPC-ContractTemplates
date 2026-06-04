@@ -789,16 +789,25 @@ sap.ui.define([
 
         _openHtmlEditorDialog: function (oItem, sHtmlContent, aClauses) {
             const sEditorId = "gpcHtmlEditor_" + Date.now();
+            const sClauseSearchId = "gpcClauseSearch_" + Date.now();
+            const sClauseListId = "gpcClauseList_" + Date.now();
+
+            this._editorSelections = this._editorSelections || {};
 
             const mClausesById = {};
             const sClausesHtml = (aClauses || []).map(function (oClause) {
                 mClausesById[oClause.clauseId] = oClause;
 
                 return [
-                    "<div style='border:1px solid #d9e2ec;border-radius:0.5rem;padding:0.75rem;margin-bottom:0.75rem;background:#fff;'>",
+                    "<div class='gpcClauseCard' ",
+                    "data-clause-title='", this._escapeHtml((oClause.title || "").toLowerCase()), "' ",
+                    "data-clause-category='", this._escapeHtml((oClause.category || "").toLowerCase()), "' ",
+                    "style='border:1px solid #d9e2ec;border-radius:0.5rem;padding:0.75rem;margin-bottom:0.75rem;background:#fff;'>",
+
                     "<div style='font-weight:bold;margin-bottom:0.25rem;'>",
                     this._escapeHtml(oClause.title),
                     "</div>",
+
                     "<div style='font-size:0.8rem;color:#556b82;margin-bottom:0.5rem;'>",
                     this._escapeHtml(oClause.category),
                     " · ",
@@ -806,16 +815,25 @@ sap.ui.define([
                     " · ",
                     this._escapeHtml(oClause.status),
                     "</div>",
+
+                    "<div style='display:flex;gap:0.5rem;flex-wrap:wrap;'>",
+
                     "<button type='button' ",
-                    "data-clause-id='",
-                    this._escapeHtml(oClause.clauseId),
-                    "' ",
-                    "data-editor-id='",
-                    this._escapeHtml(sEditorId),
-                    "' ",
+                    "data-action='insert-clause' ",
+                    "data-clause-id='", this._escapeHtml(oClause.clauseId), "' ",
+                    "data-editor-id='", this._escapeHtml(sEditorId), "' ",
                     "style='padding:0.35rem 0.6rem;border-radius:0.35rem;border:1px solid #0a6ed1;background:#0a6ed1;color:white;cursor:pointer;'>",
-                    "Insertar cláusula",
+                    "Insertar",
                     "</button>",
+
+                    "<button type='button' ",
+                    "data-action='preview-clause' ",
+                    "data-clause-id='", this._escapeHtml(oClause.clauseId), "' ",
+                    "style='padding:0.35rem 0.6rem;border-radius:0.35rem;border:1px solid #8aa1b8;background:white;color:#0a6ed1;cursor:pointer;'>",
+                    "Vista previa",
+                    "</button>",
+
+                    "</div>",
                     "</div>"
                 ].join("");
             }.bind(this)).join("");
@@ -823,12 +841,29 @@ sap.ui.define([
             const oHtml = new HTML({
                 sanitizeContent: false,
                 content:
-                    "<div style='display:flex;gap:1rem;padding:1rem;height:68vh;box-sizing:border-box;'>" +
+                    "<div style='display:flex;gap:1rem;padding:1rem;height:70vh;box-sizing:border-box;'>" +
 
                     "<div style='flex:1;display:flex;flex-direction:column;min-width:0;'>" +
+
                     "<div style='margin-bottom:0.75rem;color:#556b82;'>" +
                     "Editando una representación HTML del documento. Al guardar se creará una nueva versión BORRADOR en el repositorio." +
                     "</div>" +
+
+                    "<div style='display:flex;gap:0.35rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.5rem;border:1px solid #d9e2ec;border-radius:0.5rem;background:#f7f9fb;'>" +
+
+                    "<button type='button' data-editor-command='bold' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;font-weight:bold;'>B</button>" +
+                    "<button type='button' data-editor-command='italic' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;font-style:italic;'>I</button>" +
+                    "<button type='button' data-editor-command='underline' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;text-decoration:underline;'>U</button>" +
+
+                    "<button type='button' data-editor-command='h2' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Título</button>" +
+                    "<button type='button' data-editor-command='p' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Párrafo</button>" +
+                    "<button type='button' data-editor-command='ul' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Lista</button>" +
+                    "<button type='button' data-editor-command='ol' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Numerada</button>" +
+                    "<button type='button' data-editor-command='hr' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Separador</button>" +
+                    "<button type='button' data-editor-command='clear' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Limpiar formato</button>" +
+
+                    "</div>" +
+
                     "<div id='" + sEditorId + "' " +
                     "contenteditable='true' " +
                     "style='" +
@@ -841,13 +876,26 @@ sap.ui.define([
                     "overflow:auto;" +
                     "font-family:Arial, sans-serif;" +
                     "line-height:1.5;" +
+                    "outline:none;" +
                     "'></div>" +
+
                     "</div>" +
 
-                    "<div style='width:340px;border-left:1px solid #d9e2ec;padding-left:1rem;overflow:auto;'>" +
+                    "<div style='width:360px;border-left:1px solid #d9e2ec;padding-left:1rem;overflow:auto;'>" +
+
                     "<h3 style='margin-top:0;'>Repositorio de cláusulas</h3>" +
-                    "<p style='font-size:0.85rem;color:#556b82;'>Selecciona una cláusula aprobada para insertarla al final del documento editado.</p>" +
+
+                    "<p style='font-size:0.85rem;color:#556b82;'>Coloca el cursor en el documento y luego presiona Insertar.</p>" +
+
+                    "<input id='" + sClauseSearchId + "' " +
+                    "type='text' " +
+                    "placeholder='Buscar cláusula...' " +
+                    "style='width:100%;box-sizing:border-box;margin-bottom:0.75rem;padding:0.5rem;border:1px solid #c9d2dc;border-radius:0.4rem;' />" +
+
+                    "<div id='" + sClauseListId + "'>" +
                     (sClausesHtml || "<p>No hay cláusulas disponibles.</p>") +
+                    "</div>" +
+
                     "</div>" +
 
                     "</div>"
@@ -855,8 +903,8 @@ sap.ui.define([
 
             const oDialog = new Dialog({
                 title: "Editor HTML - " + oItem.name,
-                contentWidth: "95%",
-                contentHeight: "88%",
+                contentWidth: "96%",
+                contentHeight: "90%",
                 verticalScrolling: false,
                 resizable: true,
                 draggable: true,
@@ -876,21 +924,39 @@ sap.ui.define([
                 }),
                 afterOpen: function () {
                     const oEditor = document.getElementById(sEditorId);
+                    const oSearch = document.getElementById(sClauseSearchId);
 
                     if (oEditor) {
                         oEditor.innerHTML = sHtmlContent || "<p>Sin contenido para editar.</p>";
+
+                        ["keyup", "mouseup", "focus", "input"].forEach(function (sEventName) {
+                            oEditor.addEventListener(sEventName, function () {
+                                this._saveEditorSelection(sEditorId);
+                            }.bind(this));
+                        }.bind(this));
                     }
 
-                    const aButtons = document.querySelectorAll(
-                        "button[data-editor-id='" + sEditorId + "'][data-clause-id]"
+                    const aCommandButtons = document.querySelectorAll(
+                        "button[data-editor-command][data-editor-id='" + sEditorId + "']"
                     );
 
-                    aButtons.forEach(function (oButton) {
+                    aCommandButtons.forEach(function (oButton) {
+                        oButton.addEventListener("click", function () {
+                            const sCommand = oButton.getAttribute("data-editor-command");
+                            this._runEditorCommand(sEditorId, sCommand);
+                        }.bind(this));
+                    }.bind(this));
+
+                    const aClauseInsertButtons = document.querySelectorAll(
+                        "button[data-action='insert-clause'][data-editor-id='" + sEditorId + "'][data-clause-id]"
+                    );
+
+                    aClauseInsertButtons.forEach(function (oButton) {
                         oButton.addEventListener("click", function () {
                             const sClauseId = oButton.getAttribute("data-clause-id");
                             const oClause = mClausesById[sClauseId];
 
-                            if (!oClause || !oEditor) {
+                            if (!oClause) {
                                 return;
                             }
 
@@ -900,18 +966,50 @@ sap.ui.define([
                                 this._escapeHtml(oClause.clauseId),
                                 "'>",
                                 oClause.html,
-                                "</section>"
+                                "</section>",
+                                "<p><br></p>"
                             ].join("");
 
-                            oEditor.innerHTML = oEditor.innerHTML + sClauseHtml;
+                            this._insertHtmlAtCursor(sEditorId, sClauseHtml);
 
                             MessageToast.show("Cláusula insertada: " + oClause.title);
                         }.bind(this));
                     }.bind(this));
+
+                    const aClausePreviewButtons = document.querySelectorAll(
+                        "button[data-action='preview-clause'][data-clause-id]"
+                    );
+
+                    aClausePreviewButtons.forEach(function (oButton) {
+                        oButton.addEventListener("click", function () {
+                            const sClauseId = oButton.getAttribute("data-clause-id");
+                            const oClause = mClausesById[sClauseId];
+
+                            if (oClause) {
+                                this._previewClause(oClause);
+                            }
+                        }.bind(this));
+                    }.bind(this));
+
+                    if (oSearch) {
+                        oSearch.addEventListener("input", function () {
+                            const sValue = (oSearch.value || "").toLowerCase();
+                            const aCards = document.querySelectorAll("#" + sClauseListId + " .gpcClauseCard");
+
+                            aCards.forEach(function (oCard) {
+                                const sTitle = oCard.getAttribute("data-clause-title") || "";
+                                const sCategory = oCard.getAttribute("data-clause-category") || "";
+                                const bVisible = !sValue || sTitle.includes(sValue) || sCategory.includes(sValue);
+
+                                oCard.style.display = bVisible ? "block" : "none";
+                            });
+                        });
+                    }
                 }.bind(this),
                 afterClose: function () {
+                    delete this._editorSelections[sEditorId];
                     oDialog.destroy();
-                }
+                }.bind(this)
             });
 
             oDialog.open();
@@ -964,6 +1062,157 @@ sap.ui.define([
                 MessageBox.error("No se pudo guardar la nueva versión:\n\n" + oError.message);
             }
         },
+
+        _saveEditorSelection: function (sEditorId) {
+            const oEditor = document.getElementById(sEditorId);
+            const oSelection = window.getSelection();
+
+            if (!oEditor || !oSelection || oSelection.rangeCount === 0) {
+                return;
+            }
+
+            const oRange = oSelection.getRangeAt(0);
+
+            if (!oEditor.contains(oRange.commonAncestorContainer)) {
+                return;
+            }
+
+            this._editorSelections = this._editorSelections || {};
+            this._editorSelections[sEditorId] = oRange.cloneRange();
+        },
+
+        _restoreEditorSelection: function (sEditorId) {
+            const oEditor = document.getElementById(sEditorId);
+            const oRange = this._editorSelections && this._editorSelections[sEditorId];
+
+            if (!oEditor || !oRange) {
+                if (oEditor) {
+                    oEditor.focus();
+                }
+                return false;
+            }
+
+            const oSelection = window.getSelection();
+
+            oSelection.removeAllRanges();
+            oSelection.addRange(oRange);
+            oEditor.focus();
+
+            return true;
+        },
+
+        _runEditorCommand: function (sEditorId, sCommand) {
+            const oEditor = document.getElementById(sEditorId);
+
+            if (!oEditor) {
+                return;
+            }
+
+            this._restoreEditorSelection(sEditorId);
+
+            switch (sCommand) {
+                case "bold":
+                    document.execCommand("bold", false, null);
+                    break;
+
+                case "italic":
+                    document.execCommand("italic", false, null);
+                    break;
+
+                case "underline":
+                    document.execCommand("underline", false, null);
+                    break;
+
+                case "h2":
+                    document.execCommand("formatBlock", false, "h2");
+                    break;
+
+                case "p":
+                    document.execCommand("formatBlock", false, "p");
+                    break;
+
+                case "ul":
+                    document.execCommand("insertUnorderedList", false, null);
+                    break;
+
+                case "ol":
+                    document.execCommand("insertOrderedList", false, null);
+                    break;
+
+                case "hr":
+                    this._insertHtmlAtCursor(sEditorId, "<hr><p><br></p>");
+                    break;
+
+                case "clear":
+                    document.execCommand("removeFormat", false, null);
+                    break;
+
+                default:
+                    break;
+            }
+
+            this._saveEditorSelection(sEditorId);
+        },
+
+        _insertHtmlAtCursor: function (sEditorId, sHtml) {
+            const oEditor = document.getElementById(sEditorId);
+
+            if (!oEditor) {
+                return;
+            }
+
+            const bRestored = this._restoreEditorSelection(sEditorId);
+
+            if (bRestored) {
+                document.execCommand("insertHTML", false, sHtml);
+                this._saveEditorSelection(sEditorId);
+                return;
+            }
+
+            oEditor.innerHTML = oEditor.innerHTML + sHtml;
+            oEditor.focus();
+            this._saveEditorSelection(sEditorId);
+        },
+
+        _previewClause: function (oClause) {
+            const oHtml = new HTML({
+                sanitizeContent: false,
+                content:
+                    "<div style='padding:1rem;font-family:Arial, sans-serif;line-height:1.5;'>" +
+                    "<h3>" + this._escapeHtml(oClause.title) + "</h3>" +
+                    "<div style='font-size:0.85rem;color:#556b82;margin-bottom:1rem;'>" +
+                    this._escapeHtml(oClause.category) +
+                    " · " +
+                    this._escapeHtml(oClause.version) +
+                    " · " +
+                    this._escapeHtml(oClause.status) +
+                    "</div>" +
+                    oClause.html +
+                    "</div>"
+            });
+
+            const oDialog = new Dialog({
+                title: "Vista previa de cláusula",
+                contentWidth: "700px",
+                contentHeight: "500px",
+                verticalScrolling: true,
+                resizable: true,
+                draggable: true,
+                content: [oHtml],
+                endButton: new Button({
+                    text: "Cerrar",
+                    press: function () {
+                        oDialog.close();
+                    }
+                }),
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
+
         _escapeHtml: function (sValue) {
             return String(sValue || "")
                 .replace(/&/g, "&amp;")
