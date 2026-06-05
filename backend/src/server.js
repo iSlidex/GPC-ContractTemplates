@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+const sapRoutes = require("./routes/sap.routes");
 const express = require("express");
 const cors = require("cors");
 
@@ -29,7 +29,7 @@ app.get("/health", (req, res) => {
 app.use("/contracts", contractsRoutes);
 app.use("/webhooks", webhooksRoutes);
 app.use("/api", repositoryRoutes);
-
+app.use("/api", sapRoutes);
 app.use((error, req, res, next) => {
   console.error(error);
 

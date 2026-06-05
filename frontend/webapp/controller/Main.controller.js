@@ -11,7 +11,9 @@ sap.ui.define([
     "sap/m/Input",
     "sap/m/Link",
     "sap/m/ObjectStatus",
-    "sap/ui/core/HTML"
+    "sap/ui/core/HTML",
+    "sap/ui/richtexteditor/RichTextEditor",
+    "sap/m/HBox"
 ], function (
     Controller,
     JSONModel,
@@ -25,7 +27,9 @@ sap.ui.define([
     Input,
     Link,
     ObjectStatus,
-    HTML
+    HTML,
+    RichTextEditor,
+    HBox
 ) {
     "use strict";
 
@@ -509,7 +513,11 @@ sap.ui.define([
 
         _openDynamicFormDialog: function (oTemplate, aVariables) {
             const oInputsByVariable = {};
-            const sDefaultContractNumber = "GPC-" + new Date().getTime().toString().slice(-6);
+            const sDefaultContractNumber = "900000000001";
+
+            const aFormVariables = (aVariables || []).filter(function (oVariable) {
+                return oVariable.name !== "CONTRACT_NUMBER";
+            });
 
             const oFormBox = new VBox({
                 width: "100%"
@@ -521,18 +529,40 @@ sap.ui.define([
             }).addStyleClass("sapUiSmallMarginBottom"));
 
             oFormBox.addItem(new Label({
-                text: "Número de contrato"
+                text: "ID / número de contrato SAP"
             }));
 
             const oContractNumberInput = new Input({
                 value: sDefaultContractNumber,
                 required: true,
-                placeholder: "Ej: GPC-0002"
+                placeholder: "Ej: 900000000001"
             });
 
-            oFormBox.addItem(oContractNumberInput);
+            const oConsultButton = new Button({
+                text: "Consultar datos de contrato",
+                icon: "sap-icon://search",
+                type: "Emphasized",
+                press: async function () {
+                    await this._fetchAndApplyContractData({
+                        contractNumberInput: oContractNumberInput,
+                        inputsByVariable: oInputsByVariable
+                    });
+                }.bind(this)
+            });
 
-            aVariables.forEach(function (oVariable) {
+            oFormBox.addItem(new HBox({
+                width: "100%",
+                alignItems: "Center",
+                items: [
+                    new VBox({
+                        width: "60%",
+                        items: [oContractNumberInput]
+                    }).addStyleClass("sapUiTinyMarginEnd"),
+                    oConsultButton
+                ]
+            }).addStyleClass("sapUiSmallMarginBottom"));
+
+            aFormVariables.forEach(function (oVariable) {
                 oFormBox.addItem(new Label({
                     text: oVariable.label + " (" + oVariable.name + ")"
                 }).addStyleClass("sapUiSmallMarginTop"));
@@ -542,10 +572,6 @@ sap.ui.define([
                     placeholder: this._placeholderForVariable(oVariable),
                     type: this._inputTypeForVariable(oVariable)
                 });
-
-                if (oVariable.name === "CONTRACT_NUMBER") {
-                    oInput.setValue(sDefaultContractNumber);
-                }
 
                 if (oVariable.name === "CONTRACT_CURRENCY") {
                     oInput.setValue("USD");
@@ -557,8 +583,8 @@ sap.ui.define([
 
             const oDialog = new Dialog({
                 title: "Generar contrato desde plantilla",
-                contentWidth: "720px",
-                contentHeight: "680px",
+                contentWidth: "760px",
+                contentHeight: "720px",
                 verticalScrolling: true,
                 resizable: true,
                 draggable: true,
@@ -587,6 +613,65 @@ sap.ui.define([
             });
 
             oDialog.open();
+        },
+
+
+        _fetchAndApplyContractData: async function (oParams) {
+            const oModel = this.getView().getModel("app");
+            const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
+
+            const sContractId = oParams.contractNumberInput.getValue();
+
+            if (!sContractId) {
+                MessageBox.warning("Indica primero el ID o número de contrato SAP.");
+                return;
+            }
+
+            try {
+                oParams.contractNumberInput.setBusy(true);
+
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl +
+                    "/api/sap/contracts/" +
+                    encodeURIComponent(sContractId)
+                );
+
+                oParams.contractNumberInput.setBusy(false);
+
+                const oValues = oResult.values || {};
+
+                if (oValues.CONTRACT_NUMBER) {
+                    oParams.contractNumberInput.setValue(oValues.CONTRACT_NUMBER);
+                }
+
+                Object.keys(oParams.inputsByVariable).forEach(function (sVariableName) {
+                    const oInput = oParams.inputsByVariable[sVariableName];
+
+                    if (
+                        oInput &&
+                        Object.prototype.hasOwnProperty.call(oValues, sVariableName)
+                    ) {
+                        oInput.setValue(oValues[sVariableName] || "");
+                    }
+                });
+
+                if (oResult.fallback) {
+                    MessageBox.warning(
+                        "Se cargaron datos mock porque no se pudo consumir el servicio SAP real.\n\n" +
+                        "Motivo:\n" +
+                        (oResult.reason || "No especificado")
+                    );
+                } else {
+                    MessageToast.show("Datos de contrato cargados desde SAP OData");
+                }
+            } catch (oError) {
+                oParams.contractNumberInput.setBusy(false);
+
+                MessageBox.error(
+                    "No se pudieron consultar los datos del contrato:\n\n" +
+                    oError.message
+                );
+            }
         },
 
         _placeholderForVariable: function (oVariable) {
@@ -634,15 +719,13 @@ sap.ui.define([
                 return;
             }
 
-            const oValues = {};
+            const oValues = {
+                CONTRACT_NUMBER: sContractNumber
+            };
 
             Object.keys(oParams.inputsByVariable).forEach(function (sVariableName) {
                 oValues[sVariableName] = oParams.inputsByVariable[sVariableName].getValue();
             });
-
-            if (oValues.CONTRACT_NUMBER && oValues.CONTRACT_NUMBER !== sContractNumber) {
-                oValues.CONTRACT_NUMBER = sContractNumber;
-            }
 
             try {
                 oParams.dialog.setBusy(true);
@@ -795,11 +878,11 @@ sap.ui.define([
         },
 
         _openHtmlEditorDialog: function (oItem, sHtmlContent, aClauses) {
-            const sEditorId = "gpcHtmlEditor_" + Date.now();
+            const sEditorId = "gpcRichTextEditor_" + Date.now();
             const sClauseSearchId = "gpcClauseSearch_" + Date.now();
             const sClauseListId = "gpcClauseList_" + Date.now();
 
-            this._editorSelections = this._editorSelections || {};
+            this._rteEditors = this._rteEditors || {};
 
             const mClausesById = {};
             const sClausesHtml = (aClauses || []).map(function (oClause) {
@@ -845,53 +928,70 @@ sap.ui.define([
                 ].join("");
             }.bind(this)).join("");
 
-            const oHtml = new HTML({
+            const oRichTextEditor = new RichTextEditor({
+                width: "100%",
+                height: "62vh",
+                value: sHtmlContent || "<p>Sin contenido para editar.</p>",
+                showGroupFont: true,
+                showGroupTextAlign: true,
+                showGroupStructure: true,
+                showGroupInsert: true,
+                showGroupLink: true
+            });
+
+            this._rteEditors[sEditorId] = oRichTextEditor;
+
+            const oEditorActions = new HBox({
+                wrap: "Wrap",
+                items: [
+                    new Button({
+                        text: "Guardar HTML borrador",
+                        type: "Emphasized",
+                        icon: "sap-icon://save",
+                        press: async function () {
+                            await this._saveHtmlDraftVersion(oItem, sEditorId, oDialog);
+                        }.bind(this)
+                    }).addStyleClass("sapUiTinyMarginEnd"),
+
+                    new Button({
+                        text: "Guardar como Word",
+                        icon: "sap-icon://doc-attachment",
+                        press: async function () {
+                            await this._saveHtmlDocxVersion(oItem, sEditorId, oDialog);
+                        }.bind(this)
+                    }).addStyleClass("sapUiTinyMarginEnd"),
+
+                    new Button({
+                        text: "Vista páginas",
+                        icon: "sap-icon://documents",
+                        press: function () {
+                            this._openPagedPreview(
+                                this._getEditorHtmlContent(sEditorId),
+                                oItem.name
+                            );
+                        }.bind(this)
+                    }).addStyleClass("sapUiTinyMarginEnd")
+                ]
+            }).addStyleClass("sapUiSmallMarginBottom");
+
+            const oLeftPanel = new VBox({
+                width: "100%",
+                items: [
+                    new Text({
+                        text: "Editando una representación HTML del documento. Puedes aplicar formato, insertar cláusulas y guardar una nueva versión."
+                    }).addStyleClass("sapUiSmallMarginBottom"),
+
+                    oEditorActions,
+
+                    oRichTextEditor
+                ]
+            });
+
+            const oClausePanel = new HTML({
                 sanitizeContent: false,
                 content:
-                    "<div style='display:flex;gap:1rem;padding:1rem;height:70vh;box-sizing:border-box;'>" +
-
-                    "<div style='flex:1;display:flex;flex-direction:column;min-width:0;'>" +
-
-                    "<div style='margin-bottom:0.75rem;color:#556b82;'>" +
-                    "Editando una representación HTML del documento. Al guardar se creará una nueva versión BORRADOR en el repositorio." +
-                    "</div>" +
-
-                    "<div style='display:flex;gap:0.35rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.5rem;border:1px solid #d9e2ec;border-radius:0.5rem;background:#f7f9fb;'>" +
-
-                    "<button type='button' data-editor-command='bold' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;font-weight:bold;'>B</button>" +
-                    "<button type='button' data-editor-command='italic' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;font-style:italic;'>I</button>" +
-                    "<button type='button' data-editor-command='underline' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;text-decoration:underline;'>U</button>" +
-
-                    "<button type='button' data-editor-command='h2' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Título</button>" +
-                    "<button type='button' data-editor-command='p' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Párrafo</button>" +
-                    "<button type='button' data-editor-command='ul' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Lista</button>" +
-                    "<button type='button' data-editor-command='ol' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Numerada</button>" +
-                    "<button type='button' data-editor-command='hr' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Separador</button>" +
-                    "<button type='button' data-editor-command='clear' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;'>Limpiar formato</button>" +
-                    "<button type='button' data-editor-action='save-docx' data-editor-id='" + sEditorId + "' style='padding:0.35rem 0.55rem;border:1px solid #0a6ed1;background:#0a6ed1;color:white;border-radius:0.35rem;'>Guardar como Word</button>" +
-                    "</div>" +
-
-                    "<div id='" + sEditorId + "' " +
-                    "contenteditable='true' " +
-                    "style='" +
-                    "flex:1;" +
-                    "min-height:56vh;" +
-                    "border:1px solid #c9d2dc;" +
-                    "border-radius:0.5rem;" +
-                    "padding:1rem;" +
-                    "background:white;" +
-                    "overflow:auto;" +
-                    "font-family:Arial, sans-serif;" +
-                    "line-height:1.5;" +
-                    "outline:none;" +
-                    "'></div>" +
-
-                    "</div>" +
-
-                    "<div style='width:360px;border-left:1px solid #d9e2ec;padding-left:1rem;overflow:auto;'>" +
-
+                    "<div style='width:100%;height:68vh;border-left:1px solid #d9e2ec;padding-left:1rem;overflow:auto;box-sizing:border-box;'>" +
                     "<h3 style='margin-top:0;'>Repositorio de cláusulas</h3>" +
-
                     "<p style='font-size:0.85rem;color:#556b82;'>Coloca el cursor en el documento y luego presiona Insertar.</p>" +
 
                     "<input id='" + sClauseSearchId + "' " +
@@ -902,63 +1002,41 @@ sap.ui.define([
                     "<div id='" + sClauseListId + "'>" +
                     (sClausesHtml || "<p>No hay cláusulas disponibles.</p>") +
                     "</div>" +
-
-                    "</div>" +
-
                     "</div>"
             });
 
+            const oLayout = new HBox({
+                width: "100%",
+                fitContainer: true,
+                items: [
+                    new VBox({
+                        width: "calc(100% - 390px)",
+                        items: [oLeftPanel]
+                    }).addStyleClass("sapUiSmallMarginEnd"),
+
+                    new VBox({
+                        width: "370px",
+                        items: [oClausePanel]
+                    })
+                ]
+            }).addStyleClass("sapUiSmallMargin");
+
             const oDialog = new Dialog({
-                title: "Editor HTML - " + oItem.name,
+                title: "Editor Rich Text - " + oItem.name,
                 contentWidth: "96%",
                 contentHeight: "90%",
                 verticalScrolling: false,
                 resizable: true,
                 draggable: true,
-                content: [oHtml],
-                beginButton: new Button({
-                    text: "Guardar como borrador",
-                    type: "Emphasized",
-                    press: async function () {
-                        await this._saveHtmlDraftVersion(oItem, sEditorId, oDialog);
-                    }.bind(this)
-                }),
+                content: [oLayout],
                 endButton: new Button({
-                    text: "Cancelar",
+                    text: "Cerrar",
                     press: function () {
                         oDialog.close();
                     }
                 }),
                 afterOpen: function () {
-                    const oEditor = document.getElementById(sEditorId);
                     const oSearch = document.getElementById(sClauseSearchId);
-
-                    if (oEditor) {
-                        oEditor.innerHTML = sHtmlContent || "<p>Sin contenido para editar.</p>";
-
-                        ["keyup", "mouseup", "focus", "input"].forEach(function (sEventName) {
-                            oEditor.addEventListener(sEventName, function () {
-                                this._saveEditorSelection(sEditorId);
-                            }.bind(this));
-                        }.bind(this));
-                    }
-
-                    const oSaveDocxButton = document.querySelector(
-                        "button[data-editor-action='save-docx'][data-editor-id='" + sEditorId + "']"
-                    );
-
-                    if (oSaveDocxButton) {
-                        oSaveDocxButton.addEventListener("click", async function () {
-                            await this._saveHtmlDocxVersion(oItem, sEditorId, oDialog);
-                        }.bind(this));
-                    }
-
-                    aCommandButtons.forEach(function (oButton) {
-                        oButton.addEventListener("click", function () {
-                            const sCommand = oButton.getAttribute("data-editor-command");
-                            this._runEditorCommand(sEditorId, sCommand);
-                        }.bind(this));
-                    }.bind(this));
 
                     const aClauseInsertButtons = document.querySelectorAll(
                         "button[data-action='insert-clause'][data-editor-id='" + sEditorId + "'][data-clause-id]"
@@ -1020,7 +1098,7 @@ sap.ui.define([
                     }
                 }.bind(this),
                 afterClose: function () {
-                    delete this._editorSelections[sEditorId];
+                    delete this._rteEditors[sEditorId];
                     oDialog.destroy();
                 }.bind(this)
             });
@@ -1030,14 +1108,12 @@ sap.ui.define([
 
         _saveHtmlDraftVersion: async function (oItem, sEditorId, oDialog) {
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
-            const oEditor = document.getElementById(sEditorId);
+            const sEditedHtml = this._getEditorHtmlContent(sEditorId);
 
-            if (!oEditor) {
-                MessageBox.error("No se encontró el editor HTML en pantalla.");
+            if (!sEditedHtml) {
+                MessageBox.error("No se encontró contenido en el editor.");
                 return;
             }
-
-            const sEditedHtml = oEditor.innerHTML;
 
             try {
                 oDialog.setBusy(true);
@@ -1168,6 +1244,24 @@ sap.ui.define([
         },
 
         _insertHtmlAtCursor: function (sEditorId, sHtml) {
+            this._rteEditors = this._rteEditors || {};
+
+            const oRichTextEditor = this._rteEditors[sEditorId];
+
+            if (oRichTextEditor) {
+                const oNativeEditor =
+                    oRichTextEditor.getNativeApi && oRichTextEditor.getNativeApi();
+
+                if (oNativeEditor && typeof oNativeEditor.insertContent === "function") {
+                    oRichTextEditor.focus();
+                    oNativeEditor.insertContent(sHtml);
+                    return;
+                }
+
+                oRichTextEditor.setValue((oRichTextEditor.getValue() || "") + sHtml);
+                return;
+            }
+
             const oEditor = document.getElementById(sEditorId);
 
             if (!oEditor) {
@@ -1186,7 +1280,6 @@ sap.ui.define([
             oEditor.focus();
             this._saveEditorSelection(sEditorId);
         },
-
         _previewClause: function (oClause) {
             const oHtml = new HTML({
                 sanitizeContent: false,
@@ -1228,14 +1321,12 @@ sap.ui.define([
 
         _saveHtmlDocxVersion: async function (oItem, sEditorId, oDialog) {
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
-            const oEditor = document.getElementById(sEditorId);
+            const sEditedHtml = this._getEditorHtmlContent(sEditorId);
 
-            if (!oEditor) {
-                MessageBox.error("No se encontró el editor HTML en pantalla.");
+            if (!sEditedHtml) {
+                MessageBox.error("No se encontró contenido en el editor.");
                 return;
             }
-
-            const sEditedHtml = oEditor.innerHTML;
 
             try {
                 oDialog.setBusy(true);
@@ -1272,7 +1363,23 @@ sap.ui.define([
                 MessageBox.error("No se pudo guardar como Word:\n\n" + oError.message);
             }
         },
+        _getEditorHtmlContent: function (sEditorId) {
+            this._rteEditors = this._rteEditors || {};
 
+            const oRichTextEditor = this._rteEditors[sEditorId];
+
+            if (oRichTextEditor) {
+                return oRichTextEditor.getValue() || "";
+            }
+
+            const oEditor = document.getElementById(sEditorId);
+
+            if (oEditor) {
+                return oEditor.innerHTML || "";
+            }
+
+            return "";
+        },
         _escapeHtml: function (sValue) {
             return String(sValue || "")
                 .replace(/&/g, "&amp;")
