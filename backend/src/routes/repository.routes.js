@@ -3,7 +3,11 @@ const router = express.Router();
 
 const {
   getClauses,
-  getClauseById
+  getClauseById,
+  updateClauseMetadata,
+  applyClauseAction,
+  createClauseVersion,
+  createClauseVariant
 } = require("../services/clauseService");
 
 const {
@@ -21,10 +25,25 @@ const {
 } = require("../services/repositoryService");
 
 const {
+  getTemplateById,
+  updateTemplateMetadata,
+  applyTemplateAction
+} = require("../services/templateMetadataService");
+
+const {
+  refreshVirtualDocument
+} = require("../services/virtualDocumentService");
+
+const {
   getFileInfo,
   previewDocxAsHtml,
   readTextFile
 } = require("../services/filePreviewService");
+
+function stripInternalClauseFields(clause) {
+  const { fullPath, ...publicClause } = clause;
+  return publicClause;
+}
 
 router.get("/repository", (req, res, next) => {
   try {
@@ -44,9 +63,57 @@ router.get("/templates", (req, res, next) => {
   }
 });
 
+router.get("/templates/:templateId", (req, res, next) => {
+  try {
+    const template = getTemplateById(req.params.templateId);
+    const variablesInfo = extractTemplateVariables(req.params.templateId);
+
+    res.json({
+      template,
+      variables: variablesInfo.variables
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/templates/:templateId/metadata", (req, res, next) => {
+  try {
+    res.json({
+      template: updateTemplateMetadata(req.params.templateId, req.body || {})
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/templates/:templateId/actions/:action", (req, res, next) => {
+  try {
+    res.json(applyTemplateAction(req.params.templateId, req.params.action));
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/templates/:templateId/variables", (req, res, next) => {
   try {
     res.json(extractTemplateVariables(req.params.templateId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/virtual-documents/refresh", async (req, res, next) => {
+  try {
+    const { templateId, contractNumber, values } = req.body || {};
+    const variablesInfo = extractTemplateVariables(templateId);
+
+    res.json(await refreshVirtualDocument({
+      template: variablesInfo.template,
+      variables: variablesInfo.variables,
+      contractNumber,
+      values: values || {}
+    }));
   } catch (error) {
     next(error);
   }
@@ -204,7 +271,7 @@ router.get("/clauses", (req, res, next) => {
     });
 
     res.json({
-      clauses
+      clauses: clauses.map(stripInternalClauseFields)
     });
   } catch (error) {
     next(error);
@@ -216,7 +283,51 @@ router.get("/clauses/:clauseId", (req, res, next) => {
     const clause = getClauseById(req.params.clauseId);
 
     res.json({
-      clause
+      clause: stripInternalClauseFields(clause)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/clauses/:clauseId/metadata", (req, res, next) => {
+  try {
+    res.json({
+      clause: stripInternalClauseFields(updateClauseMetadata(req.params.clauseId, req.body || {}))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/clauses/:clauseId/actions/:action", (req, res, next) => {
+  try {
+    const result = applyClauseAction(req.params.clauseId, req.params.action);
+
+    res.json({
+      ...result,
+      clause: result.clause ? stripInternalClauseFields(result.clause) : undefined,
+      newClause: result.newClause ? stripInternalClauseFields(result.newClause) : undefined
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/clauses/:clauseId/version", (req, res, next) => {
+  try {
+    res.json({
+      clause: stripInternalClauseFields(createClauseVersion(req.params.clauseId))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/clauses/:clauseId/variant", (req, res, next) => {
+  try {
+    res.json({
+      clause: stripInternalClauseFields(createClauseVariant(req.params.clauseId))
     });
   } catch (error) {
     next(error);

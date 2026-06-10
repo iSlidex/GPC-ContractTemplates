@@ -3,6 +3,14 @@ const path = require("path");
 const Docxtemplater = require("docxtemplater");
 const PizZip = require("pizzip");
 const PDFDocument = require("pdfkit");
+const {
+  getTemplates,
+  getTemplateById,
+  getTemplateAbsolutePath
+} = require("./templateMetadataService");
+const {
+  buildVirtualDocumentMetadata
+} = require("./virtualDocumentService");
 
 const REPO_ROOT = path.resolve(__dirname, "../../repository");
 
@@ -70,39 +78,6 @@ function flattenTree(nodes, result = []) {
   return result;
 }
 
-function parseTemplateFile(file) {
-  const extension = path.extname(file.name).toLowerCase();
-  const baseName = path.basename(file.name, extension);
-
-  const match = baseName.match(/^TPL_([^_]+)_(.+)_(v\d+)_([^_]+)$/);
-
-  if (!match) {
-    return {
-      templateId: baseName,
-      name: file.name,
-      category: "SIN_CATEGORIA",
-      contractType: baseName,
-      version: "v000",
-      status: "DESCONOCIDO",
-      extension,
-      relativePath: file.relativePath,
-      modifiedAt: file.modifiedAt
-    };
-  }
-
-  return {
-    templateId: baseName,
-    name: file.name,
-    category: match[1],
-    contractType: match[2],
-    version: match[3],
-    status: match[4],
-    extension,
-    relativePath: file.relativePath,
-    modifiedAt: file.modifiedAt
-  };
-}
-
 function getRepositoryTree() {
   ensureDir(REPO_ROOT);
 
@@ -110,44 +85,6 @@ function getRepositoryTree() {
     root: REPO_ROOT,
     tree: walkFiles(REPO_ROOT, REPO_ROOT)
   };
-}
-
-function getTemplates() {
-  const templatesRoot = path.join(REPO_ROOT, "templates");
-  const tree = walkFiles(templatesRoot, templatesRoot);
-  const flat = flattenTree(tree);
-
-  return flat
-    .filter((item) => {
-      return (
-        item.type === "file" &&
-        [".docx", ".html"].includes(item.extension)
-      );
-    })
-    .map(parseTemplateFile)
-    .sort((a, b) => {
-      if (a.category !== b.category) return a.category.localeCompare(b.category);
-      if (a.contractType !== b.contractType) return a.contractType.localeCompare(b.contractType);
-      return b.version.localeCompare(a.version);
-    });
-}
-
-function getTemplateById(templateId) {
-  const templates = getTemplates();
-  const template = templates.find((item) => item.templateId === templateId);
-
-  if (!template) {
-    const error = new Error(`Plantilla no encontrada: ${templateId}`);
-    error.statusCode = 404;
-    throw error;
-  }
-
-  return template;
-}
-
-function getTemplateAbsolutePath(template) {
-  const templatesRoot = path.join(REPO_ROOT, "templates");
-  return safeJoin(templatesRoot, template.relativePath);
 }
 
 function labelFromVariable(variableName) {
@@ -178,6 +115,33 @@ function inferVariableType(variableName) {
   return "text";
 }
 
+const SAP_VARIABLES = new Set([
+  "CONTRACT_NUMBER",
+  "CONTRACTOR_NAME",
+  "CONTRACTOR_ID",
+  "CONTRACTOR_ADDRESS",
+  "CONTRACTOR_EMAIL",
+  "CONTRACT_PURPOSE",
+  "CONTRACT_AMOUNT",
+  "CONTRACT_CURRENCY",
+  "START_DATE",
+  "END_DATE"
+]);
+
+function classifyVariable(variableName) {
+  if (SAP_VARIABLES.has(variableName)) {
+    return {
+      source: "SAP_VARIABLE",
+      ecaType: "VARIABLE"
+    };
+  }
+
+  return {
+    source: "USER_INPUT",
+    ecaType: "INPUT_FIELD"
+  };
+}
+
 function extractVariablesFromText(fullText) {
   const regex = /\{([A-Za-z0-9_]+)\}/g;
   const variablesSet = new Set();
@@ -193,7 +157,8 @@ function extractVariablesFromText(fullText) {
       name,
       label: labelFromVariable(name),
       required: true,
-      type: inferVariableType(name)
+      type: inferVariableType(name),
+      ...classifyVariable(name)
     }));
 }
 
@@ -445,6 +410,12 @@ async function generateContractDocuments({ templateId, contractNumber, values })
     variables: variablesInfo.variables,
     values: normalizedValues,
     generatedAt: new Date().toISOString(),
+    virtualDocument: buildVirtualDocumentMetadata({
+      contractNumber,
+      template,
+      variables: variablesInfo.variables,
+      values: normalizedValues
+    }),
     files: {
       document: generatedDocument,
       pdf

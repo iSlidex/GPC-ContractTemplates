@@ -9,6 +9,7 @@ framework:
   libraries:
     - name: sap.m
     - name: sap.ui.core
+    - name: sap.ui.richtexteditor
     - name: sap.ushell
     - name: themelib_sap_horizon
 server:
@@ -27,7 +28,7 @@ server:
     - name: fiori-tools-proxy
       afterMiddleware: compression
       configuration:
-        ignoreCertErrors: false # If set to true, certificate errors will be ignored. E.g. self-signed certificates will be accepted
+        ignoreCertErrors: false
         backend:
           - path: /api
             url: http://localhost:4000
