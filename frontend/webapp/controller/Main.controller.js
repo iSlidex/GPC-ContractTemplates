@@ -1786,6 +1786,45 @@ sap.ui.define([
             oDialog.open();
         },
 
+        _openPagedPreview: function (sHtmlContent, sTitle) {
+            const sPreviewHtml = sHtmlContent || "<p>Sin contenido para previsualizar.</p>";
+            const oPreview = new HTML({
+                sanitizeContent: false,
+                content: [
+                    "<div style='min-height:100%;padding:2rem;box-sizing:border-box;",
+                    "background:#eef2f6;overflow:auto;text-align:center;'>",
+                    "<div style='display:inline-block;width:816px;min-height:1056px;",
+                    "max-width:100%;box-sizing:border-box;background:#fff;color:#1f2d3d;",
+                    "text-align:left;padding:72px;box-shadow:0 0.5rem 1.5rem rgba(15,35,55,0.22);",
+                    "border:1px solid #d5dde5;font-family:Arial, sans-serif;line-height:1.45;'>",
+                    sPreviewHtml,
+                    "</div>",
+                    "</div>"
+                ].join("")
+            });
+
+            const oDialog = new Dialog({
+                title: "Vista páginas - " + (sTitle || "Documento"),
+                contentWidth: "920px",
+                contentHeight: "86vh",
+                verticalScrolling: false,
+                resizable: true,
+                draggable: true,
+                content: [oPreview],
+                endButton: new Button({
+                    text: "Cerrar",
+                    press: function () {
+                        oDialog.close();
+                    }
+                }),
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
+
         _saveHtmlDraftVersion: async function (oItem, sEditorId, oDialog) {
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
             const sEditedHtml = this._getEditorHtmlContent(sEditorId);
