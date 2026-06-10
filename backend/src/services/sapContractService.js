@@ -1,3 +1,5 @@
+const { executeHttpRequest } = require("@sap-cloud-sdk/http-client");
+
 function normalizeDate(value) {
   if (!value) {
     return "";
@@ -308,30 +310,23 @@ function getMockContract(contractId) {
   return samples[index];
 }
 
-function buildODataEntityPath(contractId) {
-  const entityPath =
-    process.env.SAP_ODATA_CONTRACT_PATH ||
-    "/sap/opu/odata/sap/ZCLM_CONTRACT_SRV_SRV/contractSet";
-
-  const keyName = process.env.SAP_ODATA_KEY_NAME || "ContractNumber";
-  const escapedContractId = String(contractId).replace(/'/g, "''");
-
-  return `${entityPath}(${keyName}='${escapedContractId}')`;
-}
-
 function buildODataCollectionPath() {
   return (
     process.env.SAP_ODATA_CONTRACT_PATH ||
     "/sap/opu/odata/sap/ZCLM_CONTRACT_SRV_SRV/contractSet"
-  );
+  ).replace(/\/$/, "");
 }
 
 function buildODataEntityPath(contractId) {
   const entityPath = buildODataCollectionPath();
-  const keyName = process.env.SAP_ODATA_KEY_NAME || "ContractNumber";
+  const lookupMode = process.env.SAP_ODATA_LOOKUP_MODE || "shortKey";
   const escapedContractId = String(contractId).replace(/'/g, "''");
 
-  return `${entityPath}(${keyName}='${escapedContractId}')`;
+  if (["filter", "pathOnly"].includes(lookupMode)) {
+    return entityPath;
+  }
+
+  return `${entityPath}('${escapedContractId}')`;
 }
 
 function buildODataUrl(contractId) {
@@ -341,20 +336,14 @@ function buildODataUrl(contractId) {
     return null;
   }
 
-  const entityPath =
-    process.env.SAP_ODATA_CONTRACT_PATH ||
-    "/sap/opu/odata/sap/ZCLM_CONTRACT_SRV_SRV/contractSet";
-
+  const keyName = process.env.SAP_ODATA_KEY_NAME || "ContractNumber";
   const escapedContractId = String(contractId).replace(/'/g, "''");
   const lookupMode = process.env.SAP_ODATA_LOOKUP_MODE || "shortKey";
-  const fullEntityPath = ["filter", "pathOnly"].includes(lookupMode)
-    ? entityPath.replace(/\/$/, "")
-    : `${entityPath}('${escapedContractId}')`;
-
-  const url = new URL(fullEntityPath, baseUrl);
+  const url = new URL(buildODataEntityPath(contractId), baseUrl);
 
   if (lookupMode === "filter") {
-    url.searchParams.set("$filter", `ContractNumber eq '${escapedContractId}'`);
+    url.searchParams.set("$filter", `${keyName} eq '${escapedContractId}'`);
+    url.searchParams.set("$top", "1");
   }
 
   const responseFormat = process.env.SAP_ODATA_RESPONSE_FORMAT || "json";
@@ -405,19 +394,18 @@ function parseSapAtomXmlContract(xml) {
 }
 async function fetchSapODataContract(contractId) {
   const destinationName = process.env.SAP_ODATA_DESTINATION_NAME;
-  const lookupMode = process.env.SAP_ODATA_LOOKUP_MODE || "key";
+  const lookupMode = process.env.SAP_ODATA_LOOKUP_MODE || "shortKey";
   const keyName = process.env.SAP_ODATA_KEY_NAME || "ContractNumber";
   const escapedContractId = String(contractId).replace(/'/g, "''");
 
   if (destinationName) {
-    const path =
-      lookupMode === "filter"
-        ? buildODataCollectionPath()
-        : buildODataEntityPath(contractId);
+    const path = buildODataEntityPath(contractId);
+    const responseFormat = process.env.SAP_ODATA_RESPONSE_FORMAT || "json";
+    const params = {};
 
-    const params = {
-      "$format": "json"
-    };
+    if (responseFormat === "json") {
+      params["$format"] = "json";
+    }
 
     if (lookupMode === "filter") {
       params["$filter"] = `${keyName} eq '${escapedContractId}'`;
@@ -448,11 +436,22 @@ async function fetchSapODataContract(contractId) {
           url: path,
           params,
           headers: {
-            Accept: "application/json"
+            Accept: responseFormat === "xml"
+              ? "application/atom+xml, application/xml, text/xml, */*"
+              : "application/json"
           },
           timeout: 10000
         }
       );
+
+      if (responseFormat === "xml") {
+        return {
+          __format: "xml",
+          rawXml: typeof response.data === "string"
+            ? response.data
+            : String(response.data || "")
+        };
+      }
 
       return response.data;
     } catch (error) {
@@ -543,11 +542,32 @@ async function fetchSapODataContract(contractId) {
   if (responseFormat === "xml") {
     return {
       __format: "xml",
-      rawXml: await response.text()
+      rawXml: responseText
     };
   }
 
-  return response.json();
+  try {
+    return JSON.parse(responseText);
+  } catch (error) {
+    const parseError = new Error(
+      [
+        requestInfo,
+        "",
+        "Response:",
+        `Status: ${response.status} ${response.statusText}`,
+        `Content-Type: ${contentType}`,
+        "",
+        "No se pudo parsear la respuesta SAP como JSON:",
+        error.message,
+        "",
+        "Body:",
+        responseText.slice(0, 2500)
+      ].join("\n")
+    );
+
+    parseError.code = "SAP_ODATA_INVALID_JSON";
+    throw parseError;
+  }
 }
 
 async function getContractData(contractId, options = {}) {
