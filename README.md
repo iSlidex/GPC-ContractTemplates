@@ -65,7 +65,10 @@ No es todavia un reemplazo productivo de SAP Enterprise Contract Assembly (ECA).
 
 - `GET /health`
 - `GET /api/templates`
+- `GET /api/templates/:templateId`
 - `GET /api/templates/:templateId/variables`
+- `PATCH /api/templates/:templateId/metadata`
+- `POST /api/templates/:templateId/actions/:action`
 - `POST /api/templates/:templateId/generate`
 - `GET /api/repository`
 - `GET /api/files/download?path=...`
@@ -77,7 +80,12 @@ No es todavia un reemplazo productivo de SAP Enterprise Contract Assembly (ECA).
 - `POST /api/files/edit/docx-version`
 - `GET /api/clauses`
 - `GET /api/clauses/:clauseId`
+- `PATCH /api/clauses/:clauseId/metadata`
+- `POST /api/clauses/:clauseId/actions/:action`
+- `POST /api/clauses/:clauseId/version`
+- `POST /api/clauses/:clauseId/variant`
 - `GET /api/sap/contracts/:contractId`
+- `POST /api/virtual-documents/refresh`
 - Legado/demo backend: `GET /contracts/:contractId`, `POST /contracts/:contractId/generate`, `GET /contracts/:contractId/document`, `POST /contracts/:contractId/generate-pdf`, `GET /contracts/:contractId/pdf`, `POST /webhooks/viafirma`.
 
 ## Variables de entorno
@@ -136,11 +144,12 @@ npm run frontend:dev:nosap
 cd frontend && npx ui5 serve --config ./ui5-local-nosap.yaml --port 8080 --accept-remote-connections
 ```
 
-Para trabajar sin SAP, levantar el backend con `SAP_ODATA_FORCE_MOCK=true`. `ui5-local-nosap.yaml` solo proxya `/api` y `/health`; `ui5-local.yaml` tambien proxya `/sap` hacia la Destination `GPC_SAP_ODATA` o el nombre que se configure en BAS/BTP.
+Para trabajar sin SAP, levantar el backend con `SAP_ODATA_FORCE_MOCK=true`. `ui5-local-nosap.yaml` solo proxya `/api` y `/health`; `ui5-local.yaml` tambien proxya `/sap` hacia la Destination `GPC_CLM_CONTRACT_ODATA`.
 
 ## Estado actual de integracion SAP
 
 - Cloud Connector/Destination se considera alcanzable desde BAS cuando el proxy local UI5 esta levantado en `localhost:8080`.
+- Destination elegida para la PoC: `GPC_CLM_CONTRACT_ODATA`.
 - El backend esta preparado para consultar SAP OData usando `SAP_ODATA_BASE_URL`.
 - Para probar SAP real localmente: levantar `frontend/ui5-local.yaml`, configurar `SAP_ODATA_BASE_URL=http://localhost:8080` en backend y consultar `GET /api/sap/contracts/900000000001`.
 - El endpoint probado por ABAP se documenta como `/sap/opu/odata/sap/ZCLM_CONTRACT_SRV_SRV/contractSet('900000000001')`.
@@ -155,6 +164,10 @@ Cubierto en la PoC:
 - Gestion basica de plantillas en repositorio local.
 - Metadatos ligeros de plantillas en `GET /api/templates`: `contentType`, `categories`, `governingLaw`, `language`, `description`, `validFrom`, `validTo`, `owner`, `revision`, `replacedBy` y `availableActions`.
 - Estados normalizados de plantillas: `DRAFT`, `SENT_FOR_APPROVAL`, `APPROVED`, `RELEASED`, `EXPIRED`, `REPLACED`, `ARCHIVED`.
+- Acciones reales de lifecycle para plantillas: enviar a aprobacion, aprobar, liberar, aprobar+liberar, reabrir, archivar, crear nueva version y restaurar.
+- Text Block Library ligera con metadata, estados, acciones, versionado y variantes para clausulas HTML.
+- Separacion de text elements en `SAP_VARIABLE`/`VARIABLE` e `USER_INPUT`/`INPUT_FIELD`.
+- Metadata de documento virtual en generacion: estado, mensajes, input fields, variables y refresh SAP/mock sin regenerar DOCX/PDF.
 - Variables/input fields por marcadores `{VARIABLE}`.
 - Autollenado desde SAP/mock.
 - Biblioteca simple de clausulas.
@@ -167,17 +180,17 @@ Parcialmente cubierto:
 - Metadatos de clausulas inferidos por nombre de archivo.
 - Versionado basado en convencion `v001`, `v002`, `v003`.
 - Estados simples en nombres de archivo, como `BORRADOR` y `APROBADO`, normalizados al modelo ECA ligero.
-- Acciones de lifecycle calculadas por backend en `availableActions`, aun sin endpoints de transicion.
+- Aprobacion/release existe como sidecar local; todavia no hay usuarios, roles ni workflow real.
 - Insercion manual de clausulas en documentos.
 - Preview y edicion HTML como aproximacion a documentos virtuales.
+- Refresh Document actualiza valores y estado, pero no regenera automaticamente el DOCX/PDF.
 
 Backlog funcional frente a ECA:
 
 - Persistir y administrar metadatos enriquecidos desde UI.
-- Endpoints reales para acciones de ciclo de vida y aprobacion/release.
 - Historial formal de versiones y marcado de versiones reemplazadas.
-- Aprobacion/release antes de uso productivo.
-- Text Block Library avanzada con clases Clause y Signature Block.
+- Bloquear uso productivo de plantillas no `RELEASED`; hoy solo se advierte.
+- Text Block Library avanzada con clases Clause y Signature Block administradas desde UI completa.
 - Versiones, variantes y estados de text blocks.
 - Edicion centralizada de text blocks.
 - Template rules y text block rules.
@@ -187,8 +200,6 @@ Backlog funcional frente a ECA:
 
 ## Backlog sugerido
 
-- Metadata formal para clausulas: title, type, class, categories, governingLaw, language, description, validity, owner, version y status.
-- Diferenciar text elements entre Input Fields de usuario y Variables autocompletadas desde SAP/mock.
 - Template rules y text block rules: `canRemove`, `fixedPosition`.
 - Conditions con expresiones y acciones de insertar, reemplazar o remover bloques.
 - Alternatives por text block con risk level `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
@@ -233,6 +244,35 @@ Campos soportados por ahora:
   "replacedBy": null
 }
 ```
+
+Las acciones de lifecycle escriben este sidecar. `CREATE_NEW_VERSION` copia el archivo actual a la siguiente version `v###`, deja la nueva en `DRAFT` y marca la anterior como `REPLACED`.
+
+## Metadata de cláusulas / text blocks
+
+Las clausulas usan la convencion:
+
+```text
+CLA_<categoria>_<titulo>_<version>_<estado>.html
+```
+
+Pueden enriquecerse con sidecar:
+
+```text
+CLA_SERVICIOS_CONFIDENCIALIDAD_v001_APROBADO.metadata.json
+```
+
+Campos soportados: `title`, `class`, `type`, `categories`, `governingLaw`, `language`, `description`, `validFrom`, `validTo`, `owner`, `version`, `revision`, `status`, `variantsOf`.
+
+## Documento virtual mínimo
+
+La generacion guarda metadata de documento virtual:
+
+- `PENDING`: faltan campos `USER_INPUT`.
+- `ERROR`: faltan variables `SAP_VARIABLE`.
+- `COMPLETED`: todos los campos requeridos tienen valor.
+- `FINAL`: reservado para futuro.
+
+`POST /api/virtual-documents/refresh` refresca variables SAP/mock y recalcula estado/mensajes. En esta iteracion no regenera automaticamente DOCX/PDF.
 
 ## Troubleshooting
 

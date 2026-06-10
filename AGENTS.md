@@ -19,10 +19,12 @@ Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly cl
 - Extract variables with `GET /api/templates/:templateId/variables`.
 - Fetch SAP/mock data with `GET /api/sap/contracts/:contractId`.
 - Generate documents with `POST /api/templates/:templateId/generate`.
+- Manage template metadata with `GET /api/templates/:templateId`, `PATCH /api/templates/:templateId/metadata`, and `POST /api/templates/:templateId/actions/:action`.
+- Refresh virtual document variables with `POST /api/virtual-documents/refresh`.
 - Browse repository with `GET /api/repository`.
 - Preview/download files through `/api/files/*`.
 - Edit DOCX/HTML as HTML and save HTML or DOCX versions.
-- Load clauses with `GET /api/clauses` and insert them in the rich text editor.
+- Load clauses with `GET /api/clauses`, manage clause metadata/actions/version/variant, and insert text blocks in the rich text editor.
 
 ## Development commands
 
@@ -64,6 +66,7 @@ For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
 - Backend: never log secrets, Basic Auth values, real credentials, or sensitive documents.
 - Frontend: keep SAPUI5 freestyle patterns and simple JSON models.
 - Frontend: do not break namespace `com.gpc.contracts.GPCGestindeContratos`.
+- The generated package/UI5 metadata may use lowercase `gpcgestindecontratos`; do not rename it broadly unless the runtime namespace is also migrated and tested.
 - Prefer small functions and incremental changes.
 - Avoid large refactors unless they are required for the requested behavior.
 - Keep API contracts stable. If an endpoint changes, update frontend and README together.
@@ -73,6 +76,7 @@ For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
 - Keep mock fallback. Do not remove it.
 - Never hardcode SAP credentials.
 - Preserve BAS/local proxy compatibility through `SAP_ODATA_BASE_URL=http://localhost:8080`.
+- Use Destination `GPC_CLM_CONTRACT_ODATA` for the local `/sap` UI5 proxy.
 - Preserve JSON and XML/Atom compatibility when touching SAP response parsing.
 - For `SAP_ODATA_RESPONSE_FORMAT=xml`, prefer the `Accept` header and do not force `$format=xml`.
 - Do not assume OData supports `$filter`; use `SAP_ODATA_LOOKUP_MODE`.
@@ -86,6 +90,8 @@ For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
 - Keep template statuses normalized to `DRAFT`, `SENT_FOR_APPROVAL`, `APPROVED`, `RELEASED`, `EXPIRED`, `REPLACED`, `ARCHIVED`.
 - Any future lifecycle endpoint must validate transitions in backend lifecycle helpers before mutating metadata.
 - Clauses live under `backend/repository/clauses/`.
+- Clause metadata is derived from `CLA_<category>_<title>_<version>_<status>` and may be enriched with an adjacent `<clauseBaseName>.metadata.json` sidecar.
+- Clause lifecycle actions must also validate transitions in backend helpers.
 - Generated outputs live under `backend/repository/generated/`.
 - Signed documents and evidence should live under `backend/repository/signed/` and `backend/repository/evidence/`.
 - Do not commit generated documents, generated PDFs, signed files, evidence, or local output folders.
@@ -97,6 +103,8 @@ Use SAP Enterprise Contract Assembly concepts as a functional reference:
 
 - Templates: metadata, versions, lifecycle states, approval/release, Word export.
 - Text blocks: clause/signature block library, metadata, variables, input fields, versions, variants, states.
+- Text elements: keep `SAP_VARIABLE`/`VARIABLE` separate from `USER_INPUT`/`INPUT_FIELD`.
+- Virtual documents: keep status/messages in generation metadata and use refresh endpoint for SAP/mock values.
 - Rules and conditions: template rules, text block rules, If / Else If / Else, insert/replace/remove actions.
 - Alternatives: alternative text blocks with risk levels Low, Medium, High, Very High.
 - Virtual documents: generated or assembled document states and refresh behavior.
@@ -105,8 +113,6 @@ Document these as alignment/backlog unless the user explicitly asks to implement
 
 ## Technical backlog
 
-- Add formal clause metadata: title, type, class, categories, governingLaw, language, description, validity, owner, version, status.
-- Separate text elements into Input Fields filled by users and Variables refreshed from SAP/mock.
 - Add template rules and text block rules such as `canRemove` and `fixedPosition`.
 - Add conditions with expressions and insert/replace/remove actions.
 - Add alternatives with risk levels `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.

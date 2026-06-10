@@ -33,6 +33,11 @@
                         text="Recargar repositorio"
                         icon="sap-icon://refresh"
                         press=".onReload" />
+                    <Button
+                        id="manageClausesButton"
+                        text="Gestionar cláusulas"
+                        icon="sap-icon://form"
+                        press=".onManageClauses" />
                 </Toolbar>
 
                 <Panel
@@ -119,6 +124,13 @@
                                                 icon="sap-icon://syntax"
                                                 type="Transparent"
                                                 press=".onShowVariables" />
+
+                                            <Button
+                                                id="templateLifecycleButton"
+                                                text="Propiedades"
+                                                icon="sap-icon://process"
+                                                type="Transparent"
+                                                press=".onOpenTemplateProperties" />
 
                                             <Button
                                                 id="useTemplateButton"

@@ -174,6 +174,10 @@ sap.ui.define([
             this._loadInitialData();
         },
 
+        _refreshTemplatesAndRepository: async function () {
+            await this._loadInitialData();
+        },
+
         onRepositoryItemPress: function (oEvent) {
             const oContext = oEvent.getSource().getBindingContext("app");
 
@@ -477,7 +481,7 @@ sap.ui.define([
 
                 const sVariables = oVariablesInfo.variables
                     .map(function (oVariable) {
-                        return "- " + oVariable.name + " (" + oVariable.type + ")";
+                        return "- " + oVariable.name + " (" + oVariable.ecaType + " / " + oVariable.source + ")";
                     })
                     .join("\n");
 
@@ -503,6 +507,321 @@ sap.ui.define([
             }
         },
 
+        _labelForAction: function (sAction) {
+            const mLabels = {
+                SEND_FOR_APPROVAL: "Enviar a aprobación",
+                APPROVE: "Aprobar",
+                RELEASE: "Liberar",
+                APPROVE_AND_RELEASE: "Aprobar + liberar",
+                REOPEN: "Reabrir",
+                ARCHIVE: "Archivar",
+                CREATE_NEW_VERSION: "Nueva versión",
+                RESTORE: "Restaurar"
+            };
+
+            return mLabels[sAction] || sAction;
+        },
+
+        onOpenTemplateProperties: async function (oEvent) {
+            try {
+                const oTemplate = this._getTemplateFromEvent(oEvent);
+                const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+                const oDetail = await this._fetchJson(
+                    sApiBaseUrl + "/api/templates/" + encodeURIComponent(oTemplate.templateId)
+                );
+
+                this._openTemplatePropertiesDialog(oDetail.template, oDetail.variables || []);
+            } catch (oError) {
+                MessageBox.error("No se pudieron abrir las propiedades:\n\n" + oError.message);
+            }
+        },
+
+        onManageClauses: async function () {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+
+            try {
+                const oResult = await this._fetchJson(sApiBaseUrl + "/api/clauses");
+                this._openClausesManagementDialog(oResult.clauses || []);
+            } catch (oError) {
+                MessageBox.error("No se pudo cargar la biblioteca de cláusulas:\n\n" + oError.message);
+            }
+        },
+
+        _openClausesManagementDialog: function (aClauses) {
+            const sTableId = "gpcClauseManager_" + Date.now();
+            const mClausesById = {};
+            const sRows = (aClauses || []).map(function (oClause) {
+                mClausesById[oClause.clauseId] = oClause;
+
+                return [
+                    "<tr>",
+                    "<td>", this._escapeHtml(oClause.title), "</td>",
+                    "<td>", this._escapeHtml(oClause.version), "</td>",
+                    "<td>", this._escapeHtml(oClause.status), "</td>",
+                    "<td>", this._escapeHtml(oClause.class), "</td>",
+                    "<td>", this._escapeHtml(oClause.type), "</td>",
+                    "<td>", this._escapeHtml(oClause.governingLaw), " / ", this._escapeHtml(oClause.language), "</td>",
+                    "<td>",
+                    "<button data-action='version' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Versión</button> ",
+                    "<button data-action='variant' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Variante</button> ",
+                    (oClause.availableActions || []).map(function (sAction) {
+                        return "<button data-action='" + this._escapeHtml(sAction) + "' data-clause-id='" +
+                            this._escapeHtml(oClause.clauseId) + "'>" + this._escapeHtml(this._labelForAction(sAction)) + "</button>";
+                    }.bind(this)).join(" "),
+                    "</td>",
+                    "</tr>"
+                ].join("");
+            }.bind(this)).join("");
+
+            const oHtml = new HTML({
+                sanitizeContent: false,
+                content: [
+                    "<div style='padding:1rem;overflow:auto;'>",
+                    "<table id='", sTableId, "' style='width:100%;border-collapse:collapse;'>",
+                    "<thead><tr>",
+                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Título</th>",
+                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Versión</th>",
+                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Estado</th>",
+                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Clase</th>",
+                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Tipo</th>",
+                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Ley / idioma</th>",
+                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Acciones</th>",
+                    "</tr></thead><tbody>",
+                    sRows || "<tr><td colspan='7'>No hay cláusulas disponibles.</td></tr>",
+                    "</tbody></table>",
+                    "</div>"
+                ].join("")
+            });
+
+            const oDialog = new Dialog({
+                title: "Gestionar cláusulas",
+                contentWidth: "95%",
+                contentHeight: "75%",
+                resizable: true,
+                draggable: true,
+                content: [oHtml],
+                endButton: new Button({
+                    text: "Cerrar",
+                    press: function () {
+                        oDialog.close();
+                    }
+                }),
+                afterOpen: function () {
+                    const oTable = document.getElementById(sTableId);
+
+                    if (!oTable) {
+                        return;
+                    }
+
+                    oTable.addEventListener("click", async function (oEvent) {
+                        const oButton = oEvent.target;
+                        const sClauseId = oButton && oButton.getAttribute("data-clause-id");
+                        const sAction = oButton && oButton.getAttribute("data-action");
+
+                        if (!sClauseId || !sAction) {
+                            return;
+                        }
+
+                        await this._executeClauseManagerAction(sClauseId, sAction, oDialog);
+                    }.bind(this));
+                }.bind(this),
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
+
+        _executeClauseManagerAction: async function (sClauseId, sAction, oDialog) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+            let sUrl;
+
+            if (sAction === "version") {
+                sUrl = sApiBaseUrl + "/api/clauses/" + encodeURIComponent(sClauseId) + "/version";
+            } else if (sAction === "variant") {
+                sUrl = sApiBaseUrl + "/api/clauses/" + encodeURIComponent(sClauseId) + "/variant";
+            } else {
+                sUrl =
+                    sApiBaseUrl +
+                    "/api/clauses/" +
+                    encodeURIComponent(sClauseId) +
+                    "/actions/" +
+                    encodeURIComponent(sAction);
+            }
+
+            try {
+                oDialog.setBusy(true);
+                const oResult = await this._fetchJson(sUrl, { method: "POST" });
+                oDialog.setBusy(false);
+                oDialog.close();
+                MessageToast.show("Acción de cláusula ejecutada");
+                await this._refreshTemplatesAndRepository();
+
+                if (oResult.newClause || oResult.clause) {
+                    MessageBox.success("Text block actualizado:\n\n" + ((oResult.newClause || oResult.clause).clauseId || ""));
+                }
+            } catch (oError) {
+                oDialog.setBusy(false);
+                MessageBox.error("No se pudo ejecutar la acción de cláusula:\n\n" + oError.message);
+            }
+        },
+
+        _openTemplatePropertiesDialog: function (oTemplate, aVariables) {
+            const oInputs = {};
+            const aFields = [
+                ["name", "Nombre"],
+                ["contentType", "Content type"],
+                ["categories", "Categorías"],
+                ["governingLaw", "Governing law"],
+                ["language", "Idioma"],
+                ["description", "Descripción"],
+                ["validFrom", "Válido desde"],
+                ["validTo", "Válido hasta"],
+                ["owner", "Owner"]
+            ];
+
+            const oBox = new VBox({ width: "100%" }).addStyleClass("sapUiMediumMargin");
+
+            oBox.addItem(new ObjectStatus({
+                text: "Estado: " + oTemplate.status,
+                state: oTemplate.statusState || "None"
+            }).addStyleClass("sapUiSmallMarginBottom"));
+
+            oBox.addItem(new Text({
+                text:
+                    "Template ID: " + oTemplate.templateId +
+                    "\nVersión: " + oTemplate.version +
+                    " / Rev. " + oTemplate.revision +
+                    "\nReemplazada por: " + (oTemplate.replacedBy || "N/D") +
+                    "\nVariables detectadas: " + aVariables.length
+            }).addStyleClass("sapUiSmallMarginBottom"));
+
+            aFields.forEach(function (aField) {
+                const sField = aField[0];
+                const sLabel = aField[1];
+                const vValue = sField === "categories"
+                    ? (oTemplate.categories || []).join(", ")
+                    : (oTemplate[sField] || "");
+
+                oBox.addItem(new Label({ text: sLabel }).addStyleClass("sapUiSmallMarginTop"));
+
+                const oInput = new Input({
+                    value: vValue
+                });
+
+                oInputs[sField] = oInput;
+                oBox.addItem(oInput);
+            });
+
+            oBox.addItem(new Text({
+                text: "Acciones disponibles: " + ((oTemplate.availableActions || []).join(", ") || "Ninguna")
+            }).addStyleClass("sapUiSmallMarginTop"));
+
+            const oActionBox = new HBox({
+                wrap: "Wrap",
+                items: (oTemplate.availableActions || []).map(function (sAction) {
+                    return new Button({
+                        text: this._labelForAction(sAction),
+                        type: sAction === "APPROVE_AND_RELEASE" || sAction === "RELEASE"
+                            ? "Emphasized"
+                            : "Transparent",
+                        press: async function () {
+                            await this._executeTemplateAction(oTemplate.templateId, sAction, oDialog);
+                        }.bind(this)
+                    }).addStyleClass("sapUiTinyMarginEnd");
+                }.bind(this))
+            }).addStyleClass("sapUiSmallMarginTop");
+
+            oBox.addItem(oActionBox);
+
+            const oDialog = new Dialog({
+                title: "Propiedades / Ciclo de vida",
+                contentWidth: "720px",
+                contentHeight: "760px",
+                verticalScrolling: true,
+                resizable: true,
+                draggable: true,
+                content: [oBox],
+                beginButton: new Button({
+                    text: "Guardar metadata",
+                    type: "Emphasized",
+                    press: async function () {
+                        await this._saveTemplateMetadata(oTemplate.templateId, oInputs, oDialog);
+                    }.bind(this)
+                }),
+                endButton: new Button({
+                    text: "Cerrar",
+                    press: function () {
+                        oDialog.close();
+                    }
+                }),
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
+
+        _saveTemplateMetadata: async function (sTemplateId, oInputs, oDialog) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+            const oPayload = {};
+
+            Object.keys(oInputs).forEach(function (sField) {
+                const sValue = oInputs[sField].getValue();
+                oPayload[sField] = sField === "categories"
+                    ? sValue.split(",").map(function (sItem) { return sItem.trim(); }).filter(Boolean)
+                    : sValue;
+            });
+
+            try {
+                oDialog.setBusy(true);
+                await this._fetchJson(
+                    sApiBaseUrl + "/api/templates/" + encodeURIComponent(sTemplateId) + "/metadata",
+                    {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(oPayload)
+                    }
+                );
+                oDialog.setBusy(false);
+                oDialog.close();
+                MessageToast.show("Metadata de plantilla guardada");
+                await this._refreshTemplatesAndRepository();
+            } catch (oError) {
+                oDialog.setBusy(false);
+                MessageBox.error("No se pudo guardar metadata:\n\n" + oError.message);
+            }
+        },
+
+        _executeTemplateAction: async function (sTemplateId, sAction, oDialog) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+
+            try {
+                oDialog.setBusy(true);
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl +
+                    "/api/templates/" +
+                    encodeURIComponent(sTemplateId) +
+                    "/actions/" +
+                    encodeURIComponent(sAction),
+                    { method: "POST" }
+                );
+                oDialog.setBusy(false);
+                oDialog.close();
+                MessageToast.show("Acción ejecutada: " + this._labelForAction(sAction));
+                await this._refreshTemplatesAndRepository();
+
+                if (oResult.newTemplate) {
+                    MessageBox.success("Nueva versión creada:\n\n" + oResult.newTemplate.templateId);
+                }
+            } catch (oError) {
+                oDialog.setBusy(false);
+                MessageBox.error("No se pudo ejecutar la acción:\n\n" + oError.message);
+            }
+        },
+
         _loadTemplateVariables: async function (sTemplateId) {
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
 
@@ -517,6 +836,12 @@ sap.ui.define([
 
             const aFormVariables = (aVariables || []).filter(function (oVariable) {
                 return oVariable.name !== "CONTRACT_NUMBER";
+            });
+            const aSapVariables = aFormVariables.filter(function (oVariable) {
+                return oVariable.source === "SAP_VARIABLE";
+            });
+            const aUserVariables = aFormVariables.filter(function (oVariable) {
+                return oVariable.source !== "SAP_VARIABLE";
             });
 
             const oFormBox = new VBox({
@@ -562,7 +887,12 @@ sap.ui.define([
                 ]
             }).addStyleClass("sapUiSmallMarginBottom"));
 
-            aFormVariables.forEach(function (oVariable) {
+            oFormBox.addItem(new ObjectStatus({
+                text: "Variables SAP",
+                state: "Information"
+            }).addStyleClass("sapUiSmallMarginTop"));
+
+            aSapVariables.forEach(function (oVariable) {
                 oFormBox.addItem(new Label({
                     text: oVariable.label + " (" + oVariable.name + ")"
                 }).addStyleClass("sapUiSmallMarginTop"));
@@ -576,6 +906,32 @@ sap.ui.define([
                 if (oVariable.name === "CONTRACT_CURRENCY") {
                     oInput.setValue("USD");
                 }
+
+                oInputsByVariable[oVariable.name] = oInput;
+                oFormBox.addItem(oInput);
+            }.bind(this));
+
+            oFormBox.addItem(new ObjectStatus({
+                text: "Campos a completar por usuario",
+                state: "Warning"
+            }).addStyleClass("sapUiSmallMarginTop"));
+
+            if (aUserVariables.length === 0) {
+                oFormBox.addItem(new Text({
+                    text: "No hay campos manuales detectados en esta plantilla."
+                }));
+            }
+
+            aUserVariables.forEach(function (oVariable) {
+                oFormBox.addItem(new Label({
+                    text: oVariable.label + " (" + oVariable.name + ")"
+                }).addStyleClass("sapUiSmallMarginTop"));
+
+                const oInput = new Input({
+                    required: true,
+                    placeholder: this._placeholderForVariable(oVariable),
+                    type: this._inputTypeForVariable(oVariable)
+                });
 
                 oInputsByVariable[oVariable.name] = oInput;
                 oFormBox.addItem(oInput);
@@ -751,6 +1107,11 @@ sap.ui.define([
                 oParams.dialog.close();
 
                 this._setGenerationResult(oResult);
+                this._lastGenerationContext = {
+                    templateId: oParams.template.templateId,
+                    contractNumber: sContractNumber,
+                    values: oValues
+                };
 
                 await this._refreshRepositoryAfterGeneration();
 
@@ -805,6 +1166,13 @@ sap.ui.define([
         _showGenerationDialog: function (oResult) {
             const oModel = this.getView().getModel("app");
             const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
+            const oVirtualDocument =
+                oResult.result &&
+                oResult.result.metadata &&
+                oResult.result.metadata.virtualDocument
+                    ? oResult.result.metadata.virtualDocument
+                    : null;
+            const aMessages = oVirtualDocument ? oVirtualDocument.messages || [] : [];
 
             const oDialog = new Dialog({
                 title: "Documentos generados",
@@ -816,6 +1184,21 @@ sap.ui.define([
                         items: [
                             new Text({
                                 text: oResult.message || "Documentos generados correctamente"
+                            }).addStyleClass("sapUiSmallMarginBottom"),
+
+                            new ObjectStatus({
+                                text: oVirtualDocument
+                                    ? "Documento virtual: " + oVirtualDocument.status
+                                    : "Documento virtual: N/D",
+                                state: oVirtualDocument && oVirtualDocument.status === "COMPLETED"
+                                    ? "Success"
+                                    : "Warning"
+                            }).addStyleClass("sapUiSmallMarginBottom"),
+
+                            new Text({
+                                text: aMessages.length
+                                    ? aMessages.join("\n")
+                                    : "Sin mensajes de validación."
                             }).addStyleClass("sapUiSmallMarginBottom"),
 
                             new Link({
@@ -838,6 +1221,13 @@ sap.ui.define([
                         ]
                     }).addStyleClass("sapUiMediumMargin")
                 ],
+                beginButton: new Button({
+                    text: "Refrescar variables SAP",
+                    icon: "sap-icon://refresh",
+                    press: async function () {
+                        await this._refreshVirtualDocument(oDialog);
+                    }.bind(this)
+                }),
                 endButton: new Button({
                     text: "Cerrar",
                     press: function () {
@@ -850,6 +1240,41 @@ sap.ui.define([
             });
 
             oDialog.open();
+        },
+
+        _refreshVirtualDocument: async function (oDialog) {
+            const oContext = this._lastGenerationContext;
+
+            if (!oContext) {
+                MessageBox.warning("No hay contexto de generación para refrescar.");
+                return;
+            }
+
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+
+            try {
+                oDialog.setBusy(true);
+                const oResult = await this._fetchJson(
+                    sApiBaseUrl + "/api/virtual-documents/refresh",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(oContext)
+                    }
+                );
+                oDialog.setBusy(false);
+                this._lastGenerationContext.values = oResult.values || oContext.values;
+                MessageBox.information(
+                    (oResult.message || "Variables refrescadas") +
+                    "\n\nEstado: " +
+                    (oResult.virtualDocument && oResult.virtualDocument.status || "N/D") +
+                    "\n\nMensajes:\n" +
+                    ((oResult.virtualDocument && oResult.virtualDocument.messages || []).join("\n") || "Sin mensajes")
+                );
+            } catch (oError) {
+                oDialog.setBusy(false);
+                MessageBox.error("No se pudo refrescar el documento virtual:\n\n" + oError.message);
+            }
         },
         _editRepositoryFile: async function (oItem) {
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
@@ -880,18 +1305,32 @@ sap.ui.define([
         _openHtmlEditorDialog: function (oItem, sHtmlContent, aClauses) {
             const sEditorId = "gpcRichTextEditor_" + Date.now();
             const sClauseSearchId = "gpcClauseSearch_" + Date.now();
+            const sClauseStatusId = "gpcClauseStatus_" + Date.now();
+            const sClauseCategoryId = "gpcClauseCategory_" + Date.now();
             const sClauseListId = "gpcClauseList_" + Date.now();
 
             this._rteEditors = this._rteEditors || {};
 
             const mClausesById = {};
-            const sClausesHtml = (aClauses || []).map(function (oClause) {
+            const aSortedClauses = (aClauses || []).slice().sort(function (a, b) {
+                if (a.status === "RELEASED" && b.status !== "RELEASED") {
+                    return -1;
+                }
+
+                if (a.status !== "RELEASED" && b.status === "RELEASED") {
+                    return 1;
+                }
+
+                return (a.title || "").localeCompare(b.title || "");
+            });
+            const sClausesHtml = aSortedClauses.map(function (oClause) {
                 mClausesById[oClause.clauseId] = oClause;
 
                 return [
                     "<div class='gpcClauseCard' ",
                     "data-clause-title='", this._escapeHtml((oClause.title || "").toLowerCase()), "' ",
                     "data-clause-category='", this._escapeHtml((oClause.category || "").toLowerCase()), "' ",
+                    "data-clause-status='", this._escapeHtml((oClause.status || "").toLowerCase()), "' ",
                     "style='border:1px solid #d9e2ec;border-radius:0.5rem;padding:0.75rem;margin-bottom:0.75rem;background:#fff;'>",
 
                     "<div style='font-weight:bold;margin-bottom:0.25rem;'>",
@@ -904,7 +1343,19 @@ sap.ui.define([
                     this._escapeHtml(oClause.version),
                     " · ",
                     this._escapeHtml(oClause.status),
+                    " · ",
+                    this._escapeHtml(oClause.class || "CLAUSE"),
+                    " · ",
+                    this._escapeHtml(oClause.type || "STANDARD"),
+                    " · ",
+                    this._escapeHtml(oClause.governingLaw || "DO"),
+                    " / ",
+                    this._escapeHtml(oClause.language || "es"),
                     "</div>",
+
+                    oClause.status === "RELEASED"
+                        ? ""
+                        : "<div style='font-size:0.75rem;color:#b06000;margin-bottom:0.5rem;'>No liberada: revisar antes de insertar productivamente.</div>",
 
                     "<div style='display:flex;gap:0.5rem;flex-wrap:wrap;'>",
 
@@ -999,6 +1450,20 @@ sap.ui.define([
                     "placeholder='Buscar cláusula...' " +
                     "style='width:100%;box-sizing:border-box;margin-bottom:0.75rem;padding:0.5rem;border:1px solid #c9d2dc;border-radius:0.4rem;' />" +
 
+                    "<input id='" + sClauseCategoryId + "' " +
+                    "type='text' " +
+                    "placeholder='Filtrar categoría...' " +
+                    "style='width:100%;box-sizing:border-box;margin-bottom:0.75rem;padding:0.5rem;border:1px solid #c9d2dc;border-radius:0.4rem;' />" +
+
+                    "<select id='" + sClauseStatusId + "' " +
+                    "style='width:100%;box-sizing:border-box;margin-bottom:0.75rem;padding:0.5rem;border:1px solid #c9d2dc;border-radius:0.4rem;'>" +
+                    "<option value=''>Todos los estados</option>" +
+                    "<option value='released'>Solo RELEASED</option>" +
+                    "<option value='draft'>DRAFT</option>" +
+                    "<option value='approved'>APPROVED</option>" +
+                    "<option value='archived'>ARCHIVED</option>" +
+                    "</select>" +
+
                     "<div id='" + sClauseListId + "'>" +
                     (sClausesHtml || "<p>No hay cláusulas disponibles.</p>") +
                     "</div>" +
@@ -1037,6 +1502,26 @@ sap.ui.define([
                 }),
                 afterOpen: function () {
                     const oSearch = document.getElementById(sClauseSearchId);
+                    const oCategory = document.getElementById(sClauseCategoryId);
+                    const oStatus = document.getElementById(sClauseStatusId);
+                    const fnFilterClauses = function () {
+                        const sValue = (oSearch && oSearch.value || "").toLowerCase();
+                        const sCategoryValue = (oCategory && oCategory.value || "").toLowerCase();
+                        const sStatusValue = (oStatus && oStatus.value || "").toLowerCase();
+                        const aCards = document.querySelectorAll("#" + sClauseListId + " .gpcClauseCard");
+
+                        aCards.forEach(function (oCard) {
+                            const sTitle = oCard.getAttribute("data-clause-title") || "";
+                            const sCategory = oCard.getAttribute("data-clause-category") || "";
+                            const sStatus = oCard.getAttribute("data-clause-status") || "";
+                            const bVisible =
+                                (!sValue || sTitle.includes(sValue) || sCategory.includes(sValue)) &&
+                                (!sCategoryValue || sCategory.includes(sCategoryValue)) &&
+                                (!sStatusValue || sStatus === sStatusValue);
+
+                            oCard.style.display = bVisible ? "block" : "none";
+                        });
+                    };
 
                     const aClauseInsertButtons = document.querySelectorAll(
                         "button[data-action='insert-clause'][data-editor-id='" + sEditorId + "'][data-clause-id]"
@@ -1082,20 +1567,10 @@ sap.ui.define([
                         }.bind(this));
                     }.bind(this));
 
-                    if (oSearch) {
-                        oSearch.addEventListener("input", function () {
-                            const sValue = (oSearch.value || "").toLowerCase();
-                            const aCards = document.querySelectorAll("#" + sClauseListId + " .gpcClauseCard");
-
-                            aCards.forEach(function (oCard) {
-                                const sTitle = oCard.getAttribute("data-clause-title") || "";
-                                const sCategory = oCard.getAttribute("data-clause-category") || "";
-                                const bVisible = !sValue || sTitle.includes(sValue) || sCategory.includes(sValue);
-
-                                oCard.style.display = bVisible ? "block" : "none";
-                            });
-                        });
-                    }
+                    if (oSearch) oSearch.addEventListener("input", fnFilterClauses);
+                    if (oCategory) oCategory.addEventListener("input", fnFilterClauses);
+                    if (oStatus) oStatus.addEventListener("change", fnFilterClauses);
+                    fnFilterClauses();
                 }.bind(this),
                 afterClose: function () {
                     delete this._rteEditors[sEditorId];

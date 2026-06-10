@@ -69,10 +69,24 @@ function isValidTemplateStatus(status) {
   return TEMPLATE_STATUSES.includes(normalizeTemplateStatus(status));
 }
 
+function assertTemplateActionAllowed(status, action) {
+  const normalizedAction = String(action || "").trim().toUpperCase();
+  const availableActions = getAvailableTemplateActions(status);
+
+  if (!availableActions.includes(normalizedAction)) {
+    const error = new Error(`Acción no permitida para estado ${normalizeTemplateStatus(status)}: ${normalizedAction}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalizedAction;
+}
+
 module.exports = {
   TEMPLATE_STATUSES,
   normalizeTemplateStatus,
   getAvailableTemplateActions,
   getTemplateStatusState,
-  isValidTemplateStatus
+  isValidTemplateStatus,
+  assertTemplateActionAllowed
 };

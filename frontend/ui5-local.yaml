@@ -9,6 +9,7 @@ framework:
   libraries:
     - name: sap.m
     - name: sap.ui.core
+    - name: sap.ui.richtexteditor
     - name: sap.ushell
     - name: themelib_sap_horizon
 server:
@@ -35,7 +36,7 @@ server:
             url: http://localhost:4000
           # Configure this Destination in BAS/BTP so the local UI5 server can proxy SAP OData.
           - path: /sap
-            destination: GPC_SAP_ODATA
+            destination: GPC_CLM_CONTRACT_ODATA
         ui5:
           path:
             - /resources
