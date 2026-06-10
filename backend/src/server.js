@@ -1,4 +1,10 @@
 require("dotenv").config();
+
+try {
+  require("@sap/xsenv").loadEnv();
+} catch (error) {
+  console.warn("No se cargó default-env.json:", error.message);
+}
 const sapRoutes = require("./routes/sap.routes");
 const express = require("express");
 const cors = require("cors");

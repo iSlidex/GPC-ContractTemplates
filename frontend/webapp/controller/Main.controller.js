@@ -13,7 +13,8 @@ sap.ui.define([
     "sap/m/ObjectStatus",
     "sap/ui/core/HTML",
     "sap/ui/richtexteditor/RichTextEditor",
-    "sap/m/HBox"
+    "sap/m/HBox",
+    "sap/m/Title",
 ], function (
     Controller,
     JSONModel,
@@ -29,7 +30,8 @@ sap.ui.define([
     ObjectStatus,
     HTML,
     RichTextEditor,
-    HBox
+    HBox,
+    Title,
 ) {
     "use strict";
 
@@ -513,30 +515,51 @@ sap.ui.define([
 
         _openDynamicFormDialog: function (oTemplate, aVariables) {
             const oInputsByVariable = {};
+            const oRawContractLookupRef = {
+                value: null
+            };
+
             const sDefaultContractNumber = "900000000001";
 
-            const aFormVariables = (aVariables || []).filter(function (oVariable) {
-                return oVariable.name !== "CONTRACT_NUMBER";
-            });
+            const aFormVariables = (aVariables || [])
+                .filter(function (oVariable) {
+                    return oVariable.name !== "CONTRACT_NUMBER";
+                })
+                .sort(function (a, b) {
+                    const aOrder = this._variableDisplayOrder(a.name);
+                    const bOrder = this._variableDisplayOrder(b.name);
+                    return aOrder - bOrder;
+                }.bind(this));
 
             const oFormBox = new VBox({
                 width: "100%"
-            }).addStyleClass("sapUiMediumMargin");
+            });
 
             oFormBox.addItem(new ObjectStatus({
                 text: "Plantilla: " + oTemplate.name,
                 state: "Success"
             }).addStyleClass("sapUiSmallMarginBottom"));
 
-            oFormBox.addItem(new Label({
-                text: "ID / número de contrato SAP"
-            }));
+            oFormBox.addItem(new Title({
+                text: "Consulta de contrato SAP",
+                level: "H4"
+            }).addStyleClass("sapUiSmallMarginTop"));
+
+            oFormBox.addItem(new Text({
+                text: "Ingresa el ID del contrato SAP para autocompletar los datos del formulario. Si el servicio real no está disponible, se utilizará un mock de respaldo."
+            }).addStyleClass("sapUiSmallMarginBottom"));
 
             const oContractNumberInput = new Input({
                 value: sDefaultContractNumber,
                 required: true,
+                width: "100%",
                 placeholder: "Ej: 900000000001"
             });
+
+            const oLookupStatus = new ObjectStatus({
+                text: "Sin consulta realizada",
+                state: "None"
+            }).addStyleClass("sapUiSmallMarginTop sapUiTinyMarginBottom");
 
             const oConsultButton = new Button({
                 text: "Consultar datos de contrato",
@@ -545,53 +568,142 @@ sap.ui.define([
                 press: async function () {
                     await this._fetchAndApplyContractData({
                         contractNumberInput: oContractNumberInput,
-                        inputsByVariable: oInputsByVariable
+                        inputsByVariable: oInputsByVariable,
+                        lookupStatus: oLookupStatus,
+                        rawContractLookupRef: oRawContractLookupRef
                     });
+                }.bind(this)
+            }).addStyleClass("sapUiTinyMarginEnd");
+
+            const oClearButton = new Button({
+                text: "Limpiar datos",
+                icon: "sap-icon://decline",
+                press: function () {
+                    this._clearContractForm({
+                        contractNumberInput: oContractNumberInput,
+                        inputsByVariable: oInputsByVariable,
+                        lookupStatus: oLookupStatus,
+                        rawContractLookupRef: oRawContractLookupRef
+                    });
+                }.bind(this)
+            }).addStyleClass("sapUiTinyMarginEnd");
+
+            const oRawJsonButton = new Button({
+                text: "Ver JSON",
+                icon: "sap-icon://inspect",
+                press: function () {
+                    this._showRawContractDataDialog(oRawContractLookupRef.value);
                 }.bind(this)
             });
 
+            oFormBox.addItem(new Label({
+                text: "ID / número de contrato SAP"
+            }).addStyleClass("sapUiSmallMarginTop"));
+
+            oFormBox.addItem(oContractNumberInput);
+
             oFormBox.addItem(new HBox({
-                width: "100%",
+                wrap: "Wrap",
                 alignItems: "Center",
                 items: [
-                    new VBox({
-                        width: "60%",
-                        items: [oContractNumberInput]
-                    }).addStyleClass("sapUiTinyMarginEnd"),
-                    oConsultButton
+                    oConsultButton,
+                    oClearButton,
+                    oRawJsonButton
                 ]
-            }).addStyleClass("sapUiSmallMarginBottom"));
+            }).addStyleClass("sapUiSmallMarginTop sapUiSmallMarginBottom"));
 
-            aFormVariables.forEach(function (oVariable) {
-                oFormBox.addItem(new Label({
-                    text: oVariable.label + " (" + oVariable.name + ")"
-                }).addStyleClass("sapUiSmallMarginTop"));
+            oFormBox.addItem(oLookupStatus);
 
-                const oInput = new Input({
-                    required: true,
-                    placeholder: this._placeholderForVariable(oVariable),
-                    type: this._inputTypeForVariable(oVariable)
+            const addSection = function (sTitle, aVariableNames) {
+                const aSectionVariables = aFormVariables.filter(function (oVariable) {
+                    return aVariableNames.includes(oVariable.name);
                 });
 
-                if (oVariable.name === "CONTRACT_CURRENCY") {
-                    oInput.setValue("USD");
+                if (!aSectionVariables.length) {
+                    return;
                 }
 
-                oInputsByVariable[oVariable.name] = oInput;
-                oFormBox.addItem(oInput);
-            }.bind(this));
+                oFormBox.addItem(new Title({
+                    text: sTitle,
+                    level: "H4"
+                }).addStyleClass("sapUiMediumMarginTop sapUiSmallMarginBottom"));
 
+                aSectionVariables.forEach(function (oVariable) {
+                    oFormBox.addItem(new Label({
+                        text: this._businessLabelForVariable(oVariable.name)
+                    }).addStyleClass("sapUiSmallMarginTop"));
+
+                    const oInput = new Input({
+                        required: true,
+                        width: "100%",
+                        placeholder: this._placeholderForVariable(oVariable),
+                        type: this._inputTypeForVariable(oVariable)
+                    });
+
+                    if (oVariable.name === "CONTRACT_CURRENCY") {
+                        oInput.setValue("USD");
+                    }
+
+                    oInputsByVariable[oVariable.name] = oInput;
+                    oFormBox.addItem(oInput);
+                }.bind(this));
+            }.bind(this);
+
+            addSection("Datos del contratista", [
+                "CONTRACTOR_NAME",
+                "CONTRACTOR_ID",
+                "CONTRACTOR_ADDRESS",
+                "CONTRACTOR_EMAIL"
+            ]);
+
+            addSection("Datos comerciales del contrato", [
+                "CONTRACT_PURPOSE",
+                "CONTRACT_AMOUNT",
+                "CONTRACT_CURRENCY"
+            ]);
+
+            addSection("Vigencia", [
+                "START_DATE",
+                "END_DATE"
+            ]);
+
+            const aKnownVariables = [
+                "CONTRACTOR_NAME",
+                "CONTRACTOR_ID",
+                "CONTRACTOR_ADDRESS",
+                "CONTRACTOR_EMAIL",
+                "CONTRACT_PURPOSE",
+                "CONTRACT_AMOUNT",
+                "CONTRACT_CURRENCY",
+                "START_DATE",
+                "END_DATE"
+            ];
+
+            const aOtherVariables = aFormVariables
+                .map(function (oVariable) {
+                    return oVariable.name;
+                })
+                .filter(function (sVariableName) {
+                    return !aKnownVariables.includes(sVariableName);
+                });
+
+            addSection("Otros datos requeridos por la plantilla", aOtherVariables);
+            const oDialogContent = new VBox({
+                width: "100%",
+                items: [oFormBox]
+            }).addStyleClass("gpcContractFormContent");
             const oDialog = new Dialog({
                 title: "Generar contrato desde plantilla",
-                contentWidth: "760px",
-                contentHeight: "720px",
+                contentWidth: "820px",
+                contentHeight: "760px",
                 verticalScrolling: true,
                 resizable: true,
                 draggable: true,
-                content: [oFormBox],
+                content: [oDialogContent],
                 beginButton: new Button({
-                    text: "Generar DOCX/PDF",
+                    text: "Generar documento/PDF",
                     type: "Emphasized",
+                    icon: "sap-icon://documents",
                     press: async function () {
                         await this._generateDocumentsFromDialog({
                             dialog: oDialog,
@@ -614,7 +726,112 @@ sap.ui.define([
 
             oDialog.open();
         },
+        _variableDisplayOrder: function (sVariableName) {
+            const mOrder = {
+                CONTRACTOR_NAME: 10,
+                CONTRACTOR_ID: 20,
+                CONTRACTOR_ADDRESS: 30,
+                CONTRACTOR_EMAIL: 40,
+                CONTRACT_PURPOSE: 50,
+                CONTRACT_AMOUNT: 60,
+                CONTRACT_CURRENCY: 70,
+                START_DATE: 80,
+                END_DATE: 90
+            };
 
+            return mOrder[sVariableName] || 999;
+        },
+
+        _businessLabelForVariable: function (sVariableName) {
+            const mLabels = {
+                CONTRACTOR_NAME: "Nombre del contratista",
+                CONTRACTOR_ID: "RNC / identificación del contratista",
+                CONTRACTOR_ADDRESS: "Dirección del contratista",
+                CONTRACTOR_EMAIL: "Correo del contratista para firma",
+                CONTRACT_PURPOSE: "Objeto del contrato",
+                CONTRACT_AMOUNT: "Monto del contrato",
+                CONTRACT_CURRENCY: "Moneda",
+                START_DATE: "Fecha de inicio",
+                END_DATE: "Fecha de fin"
+            };
+
+            return mLabels[sVariableName] || sVariableName;
+        },
+
+        _clearContractForm: function (oParams) {
+            Object.keys(oParams.inputsByVariable).forEach(function (sVariableName) {
+                const oInput = oParams.inputsByVariable[sVariableName];
+
+                if (oInput) {
+                    if (sVariableName === "CONTRACT_CURRENCY") {
+                        oInput.setValue("USD");
+                    } else {
+                        oInput.setValue("");
+                    }
+                }
+            });
+
+            if (oParams.lookupStatus) {
+                oParams.lookupStatus.setText("Datos limpiados");
+                oParams.lookupStatus.setState("None");
+            }
+
+            if (oParams.rawContractLookupRef) {
+                oParams.rawContractLookupRef.value = null;
+            }
+
+            MessageToast.show("Formulario limpiado");
+        },
+
+        _showRawContractDataDialog: function (oRawData) {
+            if (!oRawData) {
+                MessageBox.information("Todavía no hay una respuesta SAP/mock cargada.");
+                return;
+            }
+
+            const sJson = JSON.stringify(oRawData, null, 2);
+            const sJsonContainerId = "gpcRawJson_" + Date.now();
+
+            const oHtml = new HTML({
+                sanitizeContent: false,
+                content:
+                    "<div style='padding:1rem;box-sizing:border-box;height:560px;'>" +
+                    "<pre id='" + sJsonContainerId + "' " +
+                    "style='height:100%;overflow:auto;margin:0;padding:1rem;" +
+                    "box-sizing:border-box;border:1px solid #d9e2ec;border-radius:0.5rem;" +
+                    "background:#f7f9fb;font-family:monospace;font-size:0.85rem;" +
+                    "white-space:pre-wrap;'></pre>" +
+                    "</div>"
+            });
+
+            const oDialog = new Dialog({
+                title: "Respuesta cruda SAP/mock",
+                contentWidth: "820px",
+                contentHeight: "640px",
+                verticalScrolling: false,
+                resizable: true,
+                draggable: true,
+                content: [oHtml],
+                endButton: new Button({
+                    text: "Cerrar",
+                    press: function () {
+                        oDialog.close();
+                    }
+                }),
+                afterOpen: function () {
+                    const oContainer = document.getElementById(sJsonContainerId);
+
+                    if (oContainer) {
+                        oContainer.textContent = sJson;
+                    }
+                },
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
 
         _fetchAndApplyContractData: async function (oParams) {
             const oModel = this.getView().getModel("app");
@@ -630,6 +847,11 @@ sap.ui.define([
             try {
                 oParams.contractNumberInput.setBusy(true);
 
+                if (oParams.lookupStatus) {
+                    oParams.lookupStatus.setText("Consultando datos del contrato...");
+                    oParams.lookupStatus.setState("Warning");
+                }
+
                 const oResult = await this._fetchJson(
                     sApiBaseUrl +
                     "/api/sap/contracts/" +
@@ -637,6 +859,10 @@ sap.ui.define([
                 );
 
                 oParams.contractNumberInput.setBusy(false);
+
+                if (oParams.rawContractLookupRef) {
+                    oParams.rawContractLookupRef.value = oResult;
+                }
 
                 const oValues = oResult.values || {};
 
@@ -655,17 +881,31 @@ sap.ui.define([
                     }
                 });
 
-                if (oResult.fallback) {
-                    MessageBox.warning(
-                        "Se cargaron datos mock porque no se pudo consumir el servicio SAP real.\n\n" +
-                        "Motivo:\n" +
-                        (oResult.reason || "No especificado")
-                    );
-                } else {
-                    MessageToast.show("Datos de contrato cargados desde SAP OData");
+                if (oParams.lookupStatus) {
+                    if (oResult.fallback) {
+                        oParams.lookupStatus.setText(
+                            "Datos cargados desde MOCK. Motivo: " +
+                            (oResult.reason || "Servicio SAP no disponible")
+                        );
+                        oParams.lookupStatus.setState("Warning");
+                    } else {
+                        oParams.lookupStatus.setText("Datos cargados desde SAP OData");
+                        oParams.lookupStatus.setState("Success");
+                    }
                 }
+
+                MessageToast.show(
+                    oResult.fallback
+                        ? "Datos cargados desde mock"
+                        : "Datos cargados desde SAP"
+                );
             } catch (oError) {
                 oParams.contractNumberInput.setBusy(false);
+
+                if (oParams.lookupStatus) {
+                    oParams.lookupStatus.setText("Error consultando datos del contrato");
+                    oParams.lookupStatus.setState("Error");
+                }
 
                 MessageBox.error(
                     "No se pudieron consultar los datos del contrato:\n\n" +
@@ -686,23 +926,25 @@ sap.ui.define([
                     return "Ej: contratista@example.com";
                 case "CONTRACT_AMOUNT":
                     return "Ej: 25000.00";
+                case "CONTRACT_CURRENCY":
+                    return "Ej: USD";
                 case "CONTRACT_PURPOSE":
-                    return "Objeto del contrato";
+                    return "Ej: Prestación de servicios profesionales de mantenimiento preventivo.";
                 case "START_DATE":
-                case "END_DATE":
                     return "Ej: 01/07/2026";
+                case "END_DATE":
+                    return "Ej: 31/12/2026";
                 default:
-                    return oVariable.label;
+                    return oVariable.label || oVariable.name;
             }
         },
-
         _inputTypeForVariable: function (oVariable) {
-            if (oVariable.type === "email") {
-                return "Email";
+            if (oVariable.name === "CONTRACT_AMOUNT") {
+                return "Text";
             }
 
-            if (oVariable.type === "number") {
-                return "Number";
+            if (oVariable.type === "email") {
+                return "Email";
             }
 
             return "Text";

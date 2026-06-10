@@ -1,1 +1,17 @@
 /* Enter your custom styles here */
+.gpcContractFormContent {
+    padding: 1rem 1.5rem 4rem 1.5rem;
+    box-sizing: border-box;
+}
+
+.gpcContractFormContent .sapMLabel {
+    margin-top: 0.75rem;
+}
+
+.gpcContractFormContent .sapMTitle {
+    margin-top: 1rem;
+}
+
+.gpcContractFormContent .sapMInputBase {
+    max-width: 100%;
+}
