@@ -6,6 +6,7 @@
   "scripts": {
     "install:all": "cd backend && npm install && cd ../frontend && npm install",
     "backend:dev": "cd backend && npm run dev",
-    "frontend:dev": "cd frontend && npx fiori run --config ./ui5-local.yaml --open test/flp.html#app-preview"
+    "frontend:dev": "cd frontend && npx ui5 serve --config ./ui5-local.yaml --port 8080 --accept-remote-connections",
+    "frontend:dev:nosap": "cd frontend && npx ui5 serve --config ./ui5-local.yaml --port 8080 --accept-remote-connections"
   }
 }

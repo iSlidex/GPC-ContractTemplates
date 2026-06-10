@@ -10,13 +10,16 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+default-env.json
 
 .DS_Store
 
+backend/*.docx
+backend/*.pdf
 backend/output/
-backend/repository/generated/
-backend/repository/signed/
-backend/repository/evidence/
+backend/repository/generated/**
+backend/repository/signed/**
+backend/repository/evidence/**
 
 frontend/dist/
 frontend/.ui5/

@@ -1,0 +1,111 @@
+# AGENTS.md
+
+## Project context
+
+This repository is a proof of concept for Grupo Punta Cana contract management and contract assembly. It demonstrates template selection, SAP/mock data lookup, dynamic variable completion, DOCX/PDF generation, local repository browsing, document preview/editing, clause insertion, and version saving.
+
+Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly clone yet; document gaps honestly and avoid large rewrites unless explicitly requested.
+
+## Architecture summary
+
+- `backend/`: Node.js + Express API.
+- `frontend/`: SAPUI5/Fiori freestyle app.
+- `backend/repository/`: local document repository for templates, clauses, generated documents, PDFs, signed files, and evidence.
+- SAP integration: backend calls SAP OData through a BAS/UI5 local proxy, Destination/Cloud Connector, or direct base URL. It must keep mock fallback behavior.
+
+## Current known flows
+
+- Load templates with `GET /api/templates`.
+- Extract variables with `GET /api/templates/:templateId/variables`.
+- Fetch SAP/mock data with `GET /api/sap/contracts/:contractId`.
+- Generate documents with `POST /api/templates/:templateId/generate`.
+- Browse repository with `GET /api/repository`.
+- Preview/download files through `/api/files/*`.
+- Edit DOCX/HTML as HTML and save HTML or DOCX versions.
+- Load clauses with `GET /api/clauses` and insert them in the rich text editor.
+
+## Development commands
+
+Install dependencies:
+
+```bash
+npm run install:all
+```
+
+Backend:
+
+```bash
+npm run backend:dev
+```
+
+Frontend:
+
+```bash
+npm run frontend:dev
+```
+
+Direct frontend command:
+
+```bash
+cd frontend && npx ui5 serve --config ./ui5-local.yaml --port 8080 --accept-remote-connections
+```
+
+For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
+
+## Coding standards
+
+- Backend: use Express route handlers, async/await, explicit errors, and `next(error)` for route failures.
+- Backend: never log secrets, Basic Auth values, real credentials, or sensitive documents.
+- Frontend: keep SAPUI5 freestyle patterns and simple JSON models.
+- Frontend: do not break namespace `com.gpc.contracts.GPCGestindeContratos`.
+- Prefer small functions and incremental changes.
+- Avoid large refactors unless they are required for the requested behavior.
+- Keep API contracts stable. If an endpoint changes, update frontend and README together.
+
+## SAP integration rules
+
+- Keep mock fallback. Do not remove it.
+- Never hardcode SAP credentials.
+- Preserve BAS/local proxy compatibility through `SAP_ODATA_BASE_URL=http://localhost:8080`.
+- Preserve JSON and XML/Atom compatibility when touching SAP response parsing.
+- Do not assume OData supports `$filter`; use `SAP_ODATA_LOOKUP_MODE`.
+- Recommended known endpoint shape: `/sap/opu/odata/sap/ZCLM_CONTRACT_SRV_SRV/contractSet('900000000001')`.
+- Keep `SAP_CLIENT` optional and configurable.
+
+## Document repository rules
+
+- Templates live under `backend/repository/templates/`.
+- Clauses live under `backend/repository/clauses/`.
+- Generated outputs live under `backend/repository/generated/`.
+- Signed documents and evidence should live under `backend/repository/signed/` and `backend/repository/evidence/`.
+- Do not commit generated documents, generated PDFs, signed files, evidence, or local output folders.
+- Preserve safe path handling for file download/preview endpoints.
+
+## ECA functional alignment
+
+Use SAP Enterprise Contract Assembly concepts as a functional reference:
+
+- Templates: metadata, versions, lifecycle states, approval/release, Word export.
+- Text blocks: clause/signature block library, metadata, variables, input fields, versions, variants, states.
+- Rules and conditions: template rules, text block rules, If / Else If / Else, insert/replace/remove actions.
+- Alternatives: alternative text blocks with risk levels Low, Medium, High, Very High.
+- Virtual documents: generated or assembled document states and refresh behavior.
+
+Document these as alignment/backlog unless the user explicitly asks to implement them.
+
+## Safe change policy
+
+- Before changing code, inspect routes, services, package scripts, and UI5 config.
+- Validate backend with `/health` when feasible.
+- Validate frontend with `ui5 serve` when feasible.
+- Run `node --check` on modified JavaScript files.
+- Keep README and AGENTS synchronized with meaningful API or workflow changes.
+
+## Do not do
+
+- Do not remove fallback mock behavior.
+- Do not remove existing endpoints.
+- Do not change API contracts without updating frontend and README.
+- Do not commit `.env`, `default-env.json`, credentials, or generated sensitive documents.
+- Do not introduce large dependencies without a clear reason.
+- Do not convert this PoC into a full rewrite.
