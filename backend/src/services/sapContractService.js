@@ -122,6 +122,7 @@ function mapSapContractToTemplateValues(rawContract, requestedContractId) {
 
   const contractorId = pick(rawContract, [
     "ContractorId",
+    "ContractorID",
     "SupplierId",
     "Vendor",
     "VendorId",
@@ -285,7 +286,10 @@ function buildODataUrl(contractId) {
   }
 
   const responseFormat = process.env.SAP_ODATA_RESPONSE_FORMAT || "json";
-  url.searchParams.set("$format", responseFormat === "xml" ? "xml" : "json");
+
+  if (responseFormat === "json") {
+    url.searchParams.set("$format", "json");
+  }
 
   if (process.env.SAP_CLIENT) {
     url.searchParams.set("sap-client", process.env.SAP_CLIENT);
@@ -307,7 +311,7 @@ async function fetchSapODataContract(contractId) {
 
   const headers = {
     Accept: responseFormat === "xml"
-      ? "application/atom+xml, application/xml, text/xml"
+      ? "application/atom+xml, application/xml, text/xml, */*"
       : "application/json"
   };
 

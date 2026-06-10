@@ -40,6 +40,7 @@ No es todavia un reemplazo productivo de SAP Enterprise Contract Assembly (ECA).
 |   |-- webapp/
 |   |-- ui5.yaml
 |   |-- ui5-local.yaml
+|   |-- ui5-local-nosap.yaml
 |   `-- package.json
 |-- .env.example
 |-- AGENTS.md
@@ -100,7 +101,7 @@ Notas:
 
 - `SAP_ODATA_FORCE_MOCK=true` evita llamadas SAP y usa datos mock.
 - `SAP_ODATA_LOOKUP_MODE=shortKey` construye rutas como `/contractSet('900000000001')`.
-- `SAP_ODATA_RESPONSE_FORMAT` soporta `json` y `xml`.
+- `SAP_ODATA_RESPONSE_FORMAT` soporta `json` y `xml`. En `json` se agrega `$format=json`; en `xml` se usa `Accept: application/atom+xml, application/xml, text/xml, */*` sin forzar `$format`.
 - `SAP_CLIENT` se envia como query parameter `sap-client` cuando esta definido.
 
 ## Comandos de desarrollo
@@ -127,18 +128,21 @@ npm run frontend:dev
 cd frontend && npx ui5 serve --config ./ui5-local.yaml --port 8080 --accept-remote-connections
 ```
 
-Frontend sin SAP real:
+Frontend sin proxy SAP:
 
 ```bash
 npm run frontend:dev:nosap
+# equivalente:
+cd frontend && npx ui5 serve --config ./ui5-local-nosap.yaml --port 8080 --accept-remote-connections
 ```
 
-Para trabajar sin SAP, levantar el backend con `SAP_ODATA_FORCE_MOCK=true`. El frontend sigue usando el proxy UI5 local para `/api` y `/health`.
+Para trabajar sin SAP, levantar el backend con `SAP_ODATA_FORCE_MOCK=true`. `ui5-local-nosap.yaml` solo proxya `/api` y `/health`; `ui5-local.yaml` tambien proxya `/sap` hacia la Destination `GPC_SAP_ODATA` o el nombre que se configure en BAS/BTP.
 
 ## Estado actual de integracion SAP
 
 - Cloud Connector/Destination se considera alcanzable desde BAS cuando el proxy local UI5 esta levantado en `localhost:8080`.
 - El backend esta preparado para consultar SAP OData usando `SAP_ODATA_BASE_URL`.
+- Para probar SAP real localmente: levantar `frontend/ui5-local.yaml`, configurar `SAP_ODATA_BASE_URL=http://localhost:8080` en backend y consultar `GET /api/sap/contracts/900000000001`.
 - El endpoint probado por ABAP se documenta como `/sap/opu/odata/sap/ZCLM_CONTRACT_SRV_SRV/contractSet('900000000001')`.
 - El modo recomendado es `SAP_ODATA_LOOKUP_MODE=shortKey`.
 - El backend soporta respuesta JSON y XML/Atom basica mediante `SAP_ODATA_RESPONSE_FORMAT`.
@@ -149,6 +153,8 @@ Para trabajar sin SAP, levantar el backend con `SAP_ODATA_FORCE_MOCK=true`. El f
 Cubierto en la PoC:
 
 - Gestion basica de plantillas en repositorio local.
+- Metadatos ligeros de plantillas en `GET /api/templates`: `contentType`, `categories`, `governingLaw`, `language`, `description`, `validFrom`, `validTo`, `owner`, `revision`, `replacedBy` y `availableActions`.
+- Estados normalizados de plantillas: `DRAFT`, `SENT_FOR_APPROVAL`, `APPROVED`, `RELEASED`, `EXPIRED`, `REPLACED`, `ARCHIVED`.
 - Variables/input fields por marcadores `{VARIABLE}`.
 - Autollenado desde SAP/mock.
 - Biblioteca simple de clausulas.
@@ -157,16 +163,18 @@ Cubierto en la PoC:
 
 Parcialmente cubierto:
 
-- Metadatos de plantillas y clausulas inferidos por nombre de archivo.
+- Metadatos de plantillas inferidos por nombre de archivo y enriquecibles con sidecar JSON.
+- Metadatos de clausulas inferidos por nombre de archivo.
 - Versionado basado en convencion `v001`, `v002`, `v003`.
-- Estados simples en nombres de archivo, como `BORRADOR` y `APROBADO`.
+- Estados simples en nombres de archivo, como `BORRADOR` y `APROBADO`, normalizados al modelo ECA ligero.
+- Acciones de lifecycle calculadas por backend en `availableActions`, aun sin endpoints de transicion.
 - Insercion manual de clausulas en documentos.
 - Preview y edicion HTML como aproximacion a documentos virtuales.
 
 Backlog funcional frente a ECA:
 
-- Metadatos enriquecidos: Name, Content Type, Categories, Governing Law, Language, Description, Valid From, Valid To, Owner.
-- Ciclo de vida formal: Draft, Sent for Approval, Approved, Released, Expired, Replaced, Archived.
+- Persistir y administrar metadatos enriquecidos desde UI.
+- Endpoints reales para acciones de ciclo de vida y aprobacion/release.
 - Historial formal de versiones y marcado de versiones reemplazadas.
 - Aprobacion/release antes de uso productivo.
 - Text Block Library avanzada con clases Clause y Signature Block.
@@ -179,6 +187,12 @@ Backlog funcional frente a ECA:
 
 ## Backlog sugerido
 
+- Metadata formal para clausulas: title, type, class, categories, governingLaw, language, description, validity, owner, version y status.
+- Diferenciar text elements entre Input Fields de usuario y Variables autocompletadas desde SAP/mock.
+- Template rules y text block rules: `canRemove`, `fixedPosition`.
+- Conditions con expresiones y acciones de insertar, reemplazar o remover bloques.
+- Alternatives por text block con risk level `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
+- Virtual documents con estados `PENDING`, `ERROR`, `COMPLETED`, `FINAL` y accion Refresh Document.
 - Persistencia real para metadatos, documentos y auditoria.
 - Seguridad/autorizacion por rol.
 - Sanitizacion y redaccion de logs sensibles.
@@ -187,6 +201,38 @@ Backlog funcional frente a ECA:
 - Validacion de variables obligatorias y tipos de datos.
 - Separar configuracion local BAS, mock y ambientes desplegados.
 - Manejo mas robusto de Atom/XML segun metadata real del servicio OData.
+
+## Metadata de plantillas
+
+Cada plantilla puede funcionar solo con metadata derivada del nombre:
+
+```text
+TPL_<categoria>_<tipoContrato>_<version>_<estado>.docx
+```
+
+Opcionalmente se puede agregar un sidecar JSON junto al archivo de plantilla:
+
+```text
+TPL_SERVICIOS_ContratoServiciosProfesionales_v003_BORRADOR.metadata.json
+```
+
+Campos soportados por ahora:
+
+```json
+{
+  "name": "Contrato de Servicios Profesionales",
+  "contentType": "DOCX",
+  "categories": ["SERVICIOS"],
+  "governingLaw": "DO",
+  "language": "es",
+  "description": "Plantilla base para servicios profesionales.",
+  "validFrom": "2026-01-01",
+  "validTo": "2026-12-31",
+  "owner": "GPC Legal",
+  "status": "DRAFT",
+  "replacedBy": null
+}
+```
 
 ## Troubleshooting
 

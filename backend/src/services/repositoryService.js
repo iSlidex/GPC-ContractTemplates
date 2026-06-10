@@ -3,6 +3,11 @@ const path = require("path");
 const Docxtemplater = require("docxtemplater");
 const PizZip = require("pizzip");
 const PDFDocument = require("pdfkit");
+const {
+  getAvailableTemplateActions,
+  getTemplateStatusState,
+  normalizeTemplateStatus
+} = require("./templateLifecycle");
 
 const REPO_ROOT = path.resolve(__dirname, "../../repository");
 
@@ -73,24 +78,25 @@ function flattenTree(nodes, result = []) {
 function parseTemplateFile(file) {
   const extension = path.extname(file.name).toLowerCase();
   const baseName = path.basename(file.name, extension);
+  const sidecarMetadata = getTemplateSidecarMetadata(file.relativePath, baseName);
 
   const match = baseName.match(/^TPL_([^_]+)_(.+)_(v\d+)_([^_]+)$/);
 
   if (!match) {
-    return {
+    return enrichTemplateMetadata({
       templateId: baseName,
       name: file.name,
       category: "SIN_CATEGORIA",
       contractType: baseName,
       version: "v000",
-      status: "DESCONOCIDO",
+      status: "DRAFT",
       extension,
       relativePath: file.relativePath,
       modifiedAt: file.modifiedAt
-    };
+    }, sidecarMetadata);
   }
 
-  return {
+  return enrichTemplateMetadata({
     templateId: baseName,
     name: file.name,
     category: match[1],
@@ -100,6 +106,74 @@ function parseTemplateFile(file) {
     extension,
     relativePath: file.relativePath,
     modifiedAt: file.modifiedAt
+  }, sidecarMetadata);
+}
+
+function getTemplateSidecarMetadata(relativePath, baseName) {
+  const templatesRoot = path.join(REPO_ROOT, "templates");
+  const templateDirectory = path.dirname(safeJoin(templatesRoot, relativePath));
+  const sidecarPath = path.join(templateDirectory, `${baseName}.metadata.json`);
+
+  if (!fs.existsSync(sidecarPath)) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(sidecarPath, "utf8"));
+  } catch (error) {
+    return {
+      metadataWarning: `No se pudo leer metadata sidecar: ${error.message}`
+    };
+  }
+}
+
+function revisionFromVersion(version) {
+  const match = String(version || "").match(/\d+/);
+  return match ? Number(match[0]) : 0;
+}
+
+function contentTypeFromExtension(extension) {
+  if (extension === ".docx") {
+    return "DOCX";
+  }
+
+  if (extension === ".html") {
+    return "HTML";
+  }
+
+  return "UNKNOWN";
+}
+
+function enrichTemplateMetadata(template, sidecarMetadata = {}) {
+  const status = normalizeTemplateStatus(sidecarMetadata.status || template.status);
+  const categories = sidecarMetadata.categories || [template.category];
+
+  return {
+    ...template,
+    ...sidecarMetadata,
+    templateId: template.templateId,
+    name: sidecarMetadata.name || template.name,
+    contentType: sidecarMetadata.contentType || contentTypeFromExtension(template.extension),
+    categories,
+    category: categories[0] || template.category,
+    governingLaw: sidecarMetadata.governingLaw || "DO",
+    language: sidecarMetadata.language || "es",
+    description:
+      sidecarMetadata.description ||
+      `Plantilla ${template.contractType} ${template.version}`,
+    validFrom: sidecarMetadata.validFrom || "",
+    validTo: sidecarMetadata.validTo || "",
+    owner: sidecarMetadata.owner || "GPC Legal",
+    version: sidecarMetadata.version || template.version,
+    revision: sidecarMetadata.revision || revisionFromVersion(template.version),
+    status,
+    statusState: getTemplateStatusState(status),
+    replacedBy: sidecarMetadata.replacedBy || null,
+    sourcePath: template.relativePath,
+    extension: template.extension,
+    relativePath: template.relativePath,
+    modifiedAt: template.modifiedAt,
+    availableActions: getAvailableTemplateActions(status)
   };
 }
 

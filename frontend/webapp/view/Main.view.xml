@@ -71,19 +71,16 @@
                             inset="false">
 
                             <columns>
-                                <Column id="templateNameColumn" width="24rem">
+                                <Column id="templateNameColumn" width="22rem">
                                     <Text id="templateNameColumnText" text="Plantilla" />
                                 </Column>
-                                <Column id="templateCategoryColumn">
-                                    <Text id="templateCategoryColumnText" text="Categoría" />
+                                <Column id="templateMetaColumn" width="16rem">
+                                    <Text id="templateMetaColumnText" text="Metadata" />
                                 </Column>
-                                <Column id="templateTypeColumn">
-                                    <Text id="templateTypeColumnText" text="Tipo" />
-                                </Column>
-                                <Column id="templateVersionColumn">
+                                <Column id="templateVersionColumn" width="8rem">
                                     <Text id="templateVersionColumnText" text="Versión" />
                                 </Column>
-                                <Column id="templateStatusColumn">
+                                <Column id="templateStatusColumn" width="10rem">
                                     <Text id="templateStatusColumnText" text="Estado" />
                                 </Column>
                                 <Column id="templateActionsColumn" width="16rem">
@@ -99,16 +96,21 @@
                                             title="{app>name}"
                                             text="{app>relativePath}" />
 
-                                        <Text id="templateCategoryText" text="{app>category}" />
+                                        <VBox id="templateMetaBox">
+                                            <Text id="templateContentTypeText" text="{app>contentType}" />
+                                            <Text id="templateLawText" text="Ley: {app>governingLaw}" />
+                                            <Text id="templateLanguageText" text="Idioma: {app>language}" />
+                                        </VBox>
 
-                                        <Text id="templateTypeText" text="{app>contractType}" />
-
-                                        <Text id="templateVersionText" text="{app>version}" />
+                                        <ObjectIdentifier
+                                            id="templateVersionText"
+                                            title="{app>version}"
+                                            text="Rev. {app>revision}" />
 
                                         <ObjectStatus
                                             id="templateStatus"
                                             text="{app>status}"
-                                            state="Success" />
+                                            state="{app>statusState}" />
 
                                         <HBox id="templateActionsBox" renderType="Bare" wrap="Wrap">
                                             <Button

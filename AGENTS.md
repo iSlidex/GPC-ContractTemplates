@@ -50,6 +50,12 @@ Direct frontend command:
 cd frontend && npx ui5 serve --config ./ui5-local.yaml --port 8080 --accept-remote-connections
 ```
 
+Frontend without SAP proxy:
+
+```bash
+npm run frontend:dev:nosap
+```
+
 For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
 
 ## Coding standards
@@ -68,6 +74,7 @@ For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
 - Never hardcode SAP credentials.
 - Preserve BAS/local proxy compatibility through `SAP_ODATA_BASE_URL=http://localhost:8080`.
 - Preserve JSON and XML/Atom compatibility when touching SAP response parsing.
+- For `SAP_ODATA_RESPONSE_FORMAT=xml`, prefer the `Accept` header and do not force `$format=xml`.
 - Do not assume OData supports `$filter`; use `SAP_ODATA_LOOKUP_MODE`.
 - Recommended known endpoint shape: `/sap/opu/odata/sap/ZCLM_CONTRACT_SRV_SRV/contractSet('900000000001')`.
 - Keep `SAP_CLIENT` optional and configurable.
@@ -75,6 +82,9 @@ For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
 ## Document repository rules
 
 - Templates live under `backend/repository/templates/`.
+- Template metadata is derived from `TPL_<category>_<contractType>_<version>_<status>` and may be enriched with an adjacent `<templateBaseName>.metadata.json` sidecar.
+- Keep template statuses normalized to `DRAFT`, `SENT_FOR_APPROVAL`, `APPROVED`, `RELEASED`, `EXPIRED`, `REPLACED`, `ARCHIVED`.
+- Any future lifecycle endpoint must validate transitions in backend lifecycle helpers before mutating metadata.
 - Clauses live under `backend/repository/clauses/`.
 - Generated outputs live under `backend/repository/generated/`.
 - Signed documents and evidence should live under `backend/repository/signed/` and `backend/repository/evidence/`.
@@ -92,6 +102,15 @@ Use SAP Enterprise Contract Assembly concepts as a functional reference:
 - Virtual documents: generated or assembled document states and refresh behavior.
 
 Document these as alignment/backlog unless the user explicitly asks to implement them.
+
+## Technical backlog
+
+- Add formal clause metadata: title, type, class, categories, governingLaw, language, description, validity, owner, version, status.
+- Separate text elements into Input Fields filled by users and Variables refreshed from SAP/mock.
+- Add template rules and text block rules such as `canRemove` and `fixedPosition`.
+- Add conditions with expressions and insert/replace/remove actions.
+- Add alternatives with risk levels `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
+- Add virtual document states `PENDING`, `ERROR`, `COMPLETED`, `FINAL` and Refresh Document behavior.
 
 ## Safe change policy
 

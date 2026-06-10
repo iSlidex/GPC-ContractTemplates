@@ -27,15 +27,12 @@ server:
     - name: fiori-tools-proxy
       afterMiddleware: compression
       configuration:
-        ignoreCertErrors: false # If set to true, certificate errors will be ignored. E.g. self-signed certificates will be accepted
+        ignoreCertErrors: false
         backend:
           - path: /api
             url: http://localhost:4000
           - path: /health
             url: http://localhost:4000
-          # Configure this Destination in BAS/BTP so the local UI5 server can proxy SAP OData.
-          - path: /sap
-            destination: GPC_SAP_ODATA
         ui5:
           path:
             - /resources
