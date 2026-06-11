@@ -104,15 +104,84 @@ sap.ui.define([
             }
         },
 
-        _fetchJson: async function (sUrl, oOptions) {
-            const oResponse = await fetch(sUrl, oOptions);
+        _sleep: function (iMilliseconds) {
+            return new Promise(function (resolve) {
+                setTimeout(resolve, iMilliseconds);
+            });
+        },
 
-            if (!oResponse.ok) {
-                const sText = await oResponse.text();
-                throw new Error(oResponse.status + " " + oResponse.statusText + " - " + sText);
+        _fetchJson: async function (sUrl, oOptions) {
+            const sMethod = ((oOptions && oOptions.method) || "GET").toUpperCase();
+            const bCanRetry = sMethod === "GET";
+            const iMaxAttempts = bCanRetry ? 3 : 1;
+
+            let oLastError;
+
+            for (let iAttempt = 1; iAttempt <= iMaxAttempts; iAttempt++) {
+                try {
+                    const oResponse = await fetch(sUrl, oOptions);
+                    const sText = await oResponse.text();
+
+                    if (!oResponse.ok) {
+                        const bTransientProxyError =
+                            bCanRetry &&
+                            (
+                                sText.includes("ECONNREFUSED") ||
+                                sText.includes("AggregateError") ||
+                                oResponse.status === 502 ||
+                                oResponse.status === 503 ||
+                                oResponse.status === 504
+                            );
+
+                        if (bTransientProxyError && iAttempt < iMaxAttempts) {
+                            await this._sleep(500);
+                            continue;
+                        }
+
+                        throw new Error(
+                            oResponse.status +
+                            " " +
+                            oResponse.statusText +
+                            " - " +
+                            sText
+                        );
+                    }
+
+                    if (!sText) {
+                        return {};
+                    }
+
+                    try {
+                        return JSON.parse(sText);
+                    } catch (oParseError) {
+                        throw new Error(
+                            "La respuesta no es JSON válido desde " +
+                            sUrl +
+                            ":\n\n" +
+                            sText.slice(0, 1500)
+                        );
+                    }
+                } catch (oError) {
+                    oLastError = oError;
+
+                    const bTransientFetchError =
+                        bCanRetry &&
+                        (
+                            String(oError.message || "").includes("ECONNREFUSED") ||
+                            String(oError.message || "").includes("Failed to fetch") ||
+                            String(oError.message || "").includes("NetworkError")
+                        );
+
+                    if (bTransientFetchError && iAttempt < iMaxAttempts) {
+                        await this._sleep(500);
+                        continue;
+                    }
+
+                    throw oError;
+                }
             }
 
-            return oResponse.json();
+            throw oLastError;
         },
 
         _prepareTree: function (aNodes) {
