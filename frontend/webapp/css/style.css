@@ -1,4 +1,141 @@
-/* Enter your custom styles here */
+.gpcEcmPage {
+    background: #f3f4f6;
+}
+
+.gpcEcmShell {
+    min-height: 100vh;
+    background: #f3f4f6;
+}
+
+.gpcShellBar {
+    height: 3rem;
+    padding: 0 1.25rem;
+    background: #003057;
+    border: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.gpcShellTitle,
+.gpcShellTitle .sapMTitle {
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+.gpcShellStatus .sapMObjStatusText,
+.gpcShellButton .sapMBtnContent,
+.gpcShellButton .sapMBtnIcon {
+    color: #ffffff !important;
+}
+
+.gpcTransactionHeader {
+    padding: 1.25rem 1.5rem 1rem 1.5rem;
+    background: #ffffff;
+    border-bottom: 1px solid #d9e2ec;
+}
+
+.gpcEyebrow {
+    color: #5b6b7c;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.gpcTransactionTitle {
+    margin-top: 0.15rem;
+    color: #1f2d3d;
+}
+
+.gpcTransactionSubtitle {
+    color: #526273;
+    margin-top: 0.2rem;
+}
+
+.gpcPillRow {
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.gpcPill {
+    padding: 0.25rem 0.65rem;
+    border: 1px solid #d9e2ec;
+    border-radius: 999px;
+    background: #f8fafc;
+}
+
+.gpcMainTabs {
+    margin: 0 1.25rem 1.5rem 1.25rem;
+}
+
+.gpcMainTabs .sapMITBHead {
+    background: #ffffff;
+    border-bottom: 1px solid #d9e2ec;
+    padding: 0 0.5rem;
+}
+
+.gpcMainTabs .sapMITBSelected .sapMITBText,
+.gpcMainTabs .sapMITBSelected .sapMITBFilterIcon {
+    color: #003057 !important;
+}
+
+.gpcMainTabs .sapMITBSelected .sapMITBContentArrow {
+    border-bottom-color: #0070d2 !important;
+}
+
+.gpcTabContent {
+    padding: 1rem 0.25rem 2rem 0.25rem;
+}
+
+.gpcEcmCard {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    padding: 0.25rem;
+}
+
+.gpcEcmCard .sapMPanelContent {
+    border-bottom: 0;
+}
+
+.gpcCardToolbar {
+    background: transparent;
+    border: 0;
+    padding: 0.5rem 0;
+}
+
+.gpcPrimaryButton .sapMBtnInner,
+.sapMBtnEmphasized {
+    background: #0070d2 !important;
+    border-color: #0070d2 !important;
+}
+
+.gpcSecondaryButton .sapMBtnInner {
+    border-color: #0070d2 !important;
+    color: #0070d2 !important;
+}
+
+.gpcFilterBar {
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.gpcMetadataGrid {
+    gap: 0.75rem;
+}
+
+.gpcMetadataItem {
+    min-width: 14rem;
+    padding: 0.85rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 0.5rem;
+    background: #fbfcfd;
+}
+
+.gpcStatusBadge {
+    border-radius: 999px;
+    padding: 0.1rem 0.4rem;
+}
+
 .gpcContractFormContent {
     padding: 1rem 1.5rem 4rem 1.5rem;
     box-sizing: border-box;
@@ -14,4 +151,17 @@
 
 .gpcContractFormContent .sapMInputBase {
     max-width: 100%;
+}
+
+.gpcContractSection {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 0.5rem;
+    background: #ffffff;
+}
+
+.gpcContractSectionHeader {
+    margin-bottom: 0.5rem;
+    color: #003057;
 }

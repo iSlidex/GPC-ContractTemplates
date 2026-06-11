@@ -2,7 +2,7 @@
   "name": "gpc-contract-management-poc",
   "version": "1.0.0",
   "private": true,
-  "description": "PoC funcional para gestión documental de contratos GPC.",
+  "description": "MVP interno / prototipo funcional para gestión documental de contratos GPC.",
   "scripts": {
     "install:all": "cd backend && npm install && cd ../frontend && npm install",
     "backend:dev": "cd backend && npm run dev",

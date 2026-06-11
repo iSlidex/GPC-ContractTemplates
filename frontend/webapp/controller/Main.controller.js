@@ -15,6 +15,10 @@ sap.ui.define([
     "sap/ui/richtexteditor/RichTextEditor",
     "sap/m/HBox",
     "sap/m/Title",
+    "sap/m/IconTabBar",
+    "sap/m/IconTabFilter",
+    "sap/m/List",
+    "sap/m/StandardListItem",
 ], function (
     Controller,
     JSONModel,
@@ -32,19 +36,47 @@ sap.ui.define([
     RichTextEditor,
     HBox,
     Title,
+    IconTabBar,
+    IconTabFilter,
+    List,
+    StandardListItem,
 ) {
     "use strict";
 
     return Controller.extend("com.gpc.contracts.GPCGestindeContratos.controller.Main", {
         onInit: function () {
             const sApiBaseUrl = this._getApiBaseUrl();
+            const oAppContext = this._buildAppContextFromQuery();
 
             const oModel = new JSONModel({
                 apiBaseUrl: sApiBaseUrl,
                 backendStatus: "Validando backend...",
                 backendStatusState: "Warning",
+                appContext: oAppContext,
+                filters: {
+                    templateText: "",
+                    templateContext: oAppContext.context,
+                    templateCategory: oAppContext.category,
+                    templateContentType: "",
+                    templateGoverningLaw: "",
+                    templateLanguage: "",
+                    templateStatus: "",
+                    templateProfile: oAppContext.profile,
+                    clauseText: "",
+                    clauseCategory: oAppContext.category,
+                    clauseStatus: "",
+                    clauseType: "",
+                    clauseClass: "",
+                    clauseGoverningLaw: "",
+                    clauseLanguage: ""
+                },
                 templates: [],
+                filteredTemplates: [],
+                clauses: [],
+                filteredClauses: [],
                 repositoryTree: [],
+                documents: [],
+                selectedDocument: null,
                 hasGenerationResult: false,
                 generationMessage: "",
                 lastGeneration: {
@@ -54,11 +86,60 @@ sap.ui.define([
                     pdfUrl: "",
                     metadataText: "",
                     metadataUrl: ""
+                },
+                virtualDocument: {
+                    status: "PENDING",
+                    messages: ["Aún no se ha generado documento virtual en esta sesión."],
+                    variables: {},
+                    inputFields: {}
                 }
             });
 
             this.getView().setModel(oModel, "app");
             this._loadInitialData();
+        },
+
+        _buildAppContextFromQuery: function () {
+            const oParams = new URLSearchParams(window.location.search || "");
+            const sProfile = oParams.get("profile") || "LEGAL_USER";
+
+            return {
+                legalTransactionId: oParams.get("contractId") || "1000000016",
+                legalTransactionName: oParams.get("transactionName") || "CONTRATO DE ARRENDAMIENTO",
+                context: oParams.get("context") || "Arrendamiento",
+                category: oParams.get("category") || "",
+                profile: sProfile,
+                roles: [sProfile],
+                availableContexts: ["Arrendamiento", "Servicios", "Compras", "Ventas", "RRHH"],
+                availableCategories: [
+                    "Arrendamiento de inmuebles",
+                    "Arrendamiento de espacios físicos",
+                    "Arrendamiento de equipos",
+                    "Arrendamiento de local",
+                    "Arrendamiento de naves",
+                    "Servicios profesionales",
+                    "Compras",
+                    "Ventas"
+                ],
+                roleFiltersEnabled: true,
+                status: "En preparación",
+                owner: "GPC Legal"
+            };
+        },
+
+        _buildQueryString: function (oParams) {
+            const oSearchParams = new URLSearchParams();
+
+            Object.keys(oParams || {}).forEach(function (sKey) {
+                const vValue = oParams[sKey];
+
+                if (vValue !== undefined && vValue !== null && vValue !== "") {
+                    oSearchParams.set(sKey, vValue);
+                }
+            });
+
+            const sQuery = oSearchParams.toString();
+            return sQuery ? "?" + sQuery : "";
         },
 
         _getApiBaseUrl: function () {
@@ -79,15 +160,29 @@ sap.ui.define([
                 oModel.setProperty("/backendStatus", "Validando backend...");
                 oModel.setProperty("/backendStatusState", "Warning");
 
-                const [oTemplates, oRepository] = await Promise.all([
-                    this._fetchJson(sApiBaseUrl + "/api/templates"),
-                    this._fetchJson(sApiBaseUrl + "/api/repository")
+                const oAppContext = oModel.getProperty("/appContext") || {};
+                const [oTemplates, oRepository, oClauses] = await Promise.all([
+                    this._fetchJson(sApiBaseUrl + "/api/templates" + this._buildQueryString({
+                        context: oAppContext.context,
+                        category: oAppContext.category,
+                        profile: oAppContext.profile
+                    })),
+                    this._fetchJson(sApiBaseUrl + "/api/repository"),
+                    this._fetchJson(sApiBaseUrl + "/api/clauses" + this._buildQueryString({
+                        category: oAppContext.category
+                    }))
                 ]);
+
+                const aPreparedTree = this._prepareTree(oRepository.tree || []);
 
                 oModel.setProperty("/backendStatus", "Backend conectado");
                 oModel.setProperty("/backendStatusState", "Success");
-                oModel.setProperty("/templates", oTemplates.templates || []);
-                oModel.setProperty("/repositoryTree", this._prepareTree(oRepository.tree || []));
+                oModel.setProperty("/templates", this._decorateTemplates(oTemplates.templates || []));
+                oModel.setProperty("/clauses", oClauses.clauses || []);
+                oModel.setProperty("/repositoryTree", aPreparedTree);
+                oModel.setProperty("/documents", this._buildDocumentRows(aPreparedTree));
+                this._applyTemplateFilters();
+                this._applyClauseFilters();
 
                 MessageToast.show("Repositorio cargado correctamente");
             } catch (oError) {
@@ -215,6 +310,186 @@ sap.ui.define([
             }
         },
 
+        _flattenRepositoryNodes: function (aNodes, aResult) {
+            const aItems = aResult || [];
+
+            (aNodes || []).forEach(function (oNode) {
+                aItems.push(oNode);
+
+                if (oNode.children && oNode.children.length) {
+                    this._flattenRepositoryNodes(oNode.children, aItems);
+                }
+            }.bind(this));
+
+            return aItems;
+        },
+
+        _buildDocumentRows: function (aRepositoryTree) {
+            return this._flattenRepositoryNodes(aRepositoryTree || [])
+                .filter(function (oNode) {
+                    return oNode.type === "file" &&
+                        String(oNode.relativePath || "").indexOf("generated") === 0 &&
+                        [".docx", ".pdf", ".html", ".json"].includes(String(oNode.extension || "").toLowerCase());
+                })
+                .map(function (oNode) {
+                    const sExtension = String(oNode.extension || "").replace(".", "").toUpperCase() || "N/D";
+                    const bMetadata = String(oNode.extension || "").toLowerCase() === ".json";
+
+                    return {
+                        ...oNode,
+                        documentClass: bMetadata ? "Metadata" : "Contrato",
+                        fileType: sExtension,
+                        contentType: sExtension,
+                        language: "es",
+                        status: bMetadata ? "COMPLETED" : "GENERATED",
+                        statusState: bMetadata ? "Success" : "Information",
+                        assemblyStatus: bMetadata ? "COMPLETED" : "PENDING",
+                        assemblyState: bMetadata ? "Success" : "Warning"
+                    };
+                });
+        },
+
+        _decorateTemplates: function (aTemplates) {
+            return (aTemplates || []).map(function (oTemplate) {
+                const bRecommended = this._templateMatchesContext(oTemplate);
+
+                return {
+                    ...oTemplate,
+                    recommendationText: bRecommended ? "Recomendada" : "Disponible",
+                    recommendationState: bRecommended ? "Success" : "None"
+                };
+            }.bind(this));
+        },
+
+        _textMatches: function (vValue, sNeedle) {
+            if (!sNeedle) {
+                return true;
+            }
+
+            const sText = Array.isArray(vValue) ? vValue.join(" ") : String(vValue || "");
+            return sText.toLowerCase().indexOf(String(sNeedle).toLowerCase()) !== -1;
+        },
+
+        _templateMatchesContext: function (oTemplate) {
+            const oContext = this.getView().getModel("app").getProperty("/appContext") || {};
+            const sContext = oContext.context;
+            const sCategory = oContext.category;
+            const sHaystack = [
+                oTemplate.contentType,
+                oTemplate.category,
+                (oTemplate.categories || []).join(" "),
+                oTemplate.description,
+                oTemplate.name,
+                oTemplate.contractType,
+                JSON.stringify(oTemplate.metadata || {})
+            ].join(" ").toLowerCase();
+
+            if (sCategory && sHaystack.indexOf(sCategory.toLowerCase()) !== -1) {
+                return true;
+            }
+
+            return !!sContext && sHaystack.indexOf(sContext.toLowerCase()) !== -1;
+        },
+
+        _profileAllowsTemplate: function (oTemplate, sProfile) {
+            const sStatus = String(oTemplate.status || "").toUpperCase();
+
+            switch (sProfile) {
+                case "LEGAL_ADMIN":
+                    return true;
+                case "BUSINESS_USER":
+                    return ["RELEASED", "APPROVED"].includes(sStatus);
+                case "VIEWER":
+                    return sStatus === "RELEASED";
+                case "LEGAL_USER":
+                default:
+                    return sStatus !== "ARCHIVED";
+            }
+        },
+
+        _applyTemplateFilters: function () {
+            const oModel = this.getView().getModel("app");
+            const oFilters = oModel.getProperty("/filters") || {};
+            const aTemplates = oModel.getProperty("/templates") || [];
+            const aBaseFiltered = aTemplates.filter(function (oTemplate) {
+                const sFullText = [
+                    oTemplate.name,
+                    oTemplate.description,
+                    oTemplate.contractType,
+                    oTemplate.contentType,
+                    oTemplate.governingLaw,
+                    oTemplate.language,
+                    oTemplate.status,
+                    oTemplate.owner,
+                    (oTemplate.categories || []).join(" ")
+                ].join(" ");
+
+                return this._textMatches(sFullText, oFilters.templateText) &&
+                    this._textMatches(oTemplate.contentType, oFilters.templateContentType) &&
+                    this._textMatches(oTemplate.governingLaw, oFilters.templateGoverningLaw) &&
+                    this._textMatches(oTemplate.language, oFilters.templateLanguage) &&
+                    this._textMatches(oTemplate.status, oFilters.templateStatus) &&
+                    this._profileAllowsTemplate(oTemplate, oFilters.templateProfile);
+            }.bind(this));
+            const aContextFiltered = aBaseFiltered.filter(function (oTemplate) {
+                const sContextText = [
+                    oTemplate.contentType,
+                    oTemplate.category,
+                    oTemplate.description,
+                    (oTemplate.categories || []).join(" ")
+                ].join(" ");
+
+                return this._textMatches(sContextText, oFilters.templateContext) &&
+                    this._textMatches([oTemplate.category, (oTemplate.categories || []).join(" ")].join(" "), oFilters.templateCategory);
+            }.bind(this));
+            const aFiltered = (oFilters.templateContext || oFilters.templateCategory) && aContextFiltered.length
+                ? aContextFiltered
+                : aBaseFiltered;
+
+            aFiltered.sort(function (a, b) {
+                return Number(b.recommendationState === "Success") - Number(a.recommendationState === "Success");
+            });
+
+            oModel.setProperty("/filteredTemplates", aFiltered);
+        },
+
+        _applyClauseFilters: function () {
+            const oModel = this.getView().getModel("app");
+            const oFilters = oModel.getProperty("/filters") || {};
+            const aClauses = oModel.getProperty("/clauses") || [];
+            const aFiltered = aClauses.filter(function (oClause) {
+                const sFullText = [
+                    oClause.title,
+                    oClause.description,
+                    oClause.category,
+                    (oClause.categories || []).join(" "),
+                    oClause.status,
+                    oClause.type,
+                    oClause.class,
+                    oClause.governingLaw,
+                    oClause.language
+                ].join(" ");
+
+                return this._textMatches(sFullText, oFilters.clauseText) &&
+                    this._textMatches([oClause.category, (oClause.categories || []).join(" ")].join(" "), oFilters.clauseCategory) &&
+                    this._textMatches(oClause.status, oFilters.clauseStatus) &&
+                    this._textMatches(oClause.type, oFilters.clauseType) &&
+                    this._textMatches(oClause.class, oFilters.clauseClass) &&
+                    this._textMatches(oClause.governingLaw, oFilters.clauseGoverningLaw) &&
+                    this._textMatches(oClause.language, oFilters.clauseLanguage);
+            }.bind(this));
+
+            oModel.setProperty("/filteredClauses", aFiltered);
+        },
+
+        onTemplateFilterChange: function () {
+            this._applyTemplateFilters();
+        },
+
+        onClauseFilterChange: function () {
+            this._applyClauseFilters();
+        },
+
         _getContextFromEvent: function (oEvent) {
             let oControl = oEvent.getSource();
 
@@ -247,6 +522,274 @@ sap.ui.define([
 
         _refreshTemplatesAndRepository: async function () {
             await this._loadInitialData();
+        },
+
+        onCreateDocumentAction: function (oEvent) {
+            const sKey = oEvent.getParameter("item") && oEvent.getParameter("item").getKey();
+
+            if (sKey === "upload") {
+                MessageBox.information("Carga de archivo reservada para una iteración posterior. Usa el repositorio para previsualizar/editar archivos existentes.");
+                return;
+            }
+
+            this.onCreateFromTemplate();
+        },
+
+        onCreateFromTemplate: function () {
+            const oModel = this.getView().getModel("app");
+            const oContext = oModel.getProperty("/appContext") || {};
+            const aTemplates = oModel.getProperty("/filteredTemplates") || [];
+            const oDialogModel = new JSONModel({
+                templates: aTemplates,
+                selectedTemplate: aTemplates[0] || null,
+                documentName: this._buildDefaultDocumentName(aTemplates[0], oContext),
+                search: ""
+            });
+            const oList = new List({
+                mode: "SingleSelectMaster",
+                selectionChange: function (oEvent) {
+                    const oItem = oEvent.getParameter("listItem");
+                    const oTemplate = oItem && oItem.getBindingContext("createDoc").getObject();
+                    oDialogModel.setProperty("/selectedTemplate", oTemplate || null);
+                    oDialogModel.setProperty("/documentName", this._buildDefaultDocumentName(oTemplate, oContext));
+                }.bind(this)
+            });
+
+            oList.setModel(oDialogModel, "createDoc");
+            oList.bindItems({
+                path: "createDoc>/templates",
+                template: new StandardListItem({
+                    title: "{createDoc>name}",
+                    description: "{createDoc>description}",
+                    info: "{createDoc>recommendationText}",
+                    type: "Active"
+                })
+            });
+
+            const oSearchInput = new Input({
+                placeholder: "Buscar plantilla",
+                liveChange: function (oEvent) {
+                    const sValue = oEvent.getParameter("value");
+                    const aBaseTemplates = oModel.getProperty("/filteredTemplates") || [];
+                    const aDialogTemplates = aBaseTemplates.filter(function (oTemplate) {
+                        return this._textMatches([
+                            oTemplate.name,
+                            oTemplate.description,
+                            oTemplate.category,
+                            (oTemplate.categories || []).join(" ")
+                        ].join(" "), sValue);
+                    }.bind(this));
+
+                    oDialogModel.setProperty("/templates", aDialogTemplates);
+                    oDialogModel.setProperty("/selectedTemplate", aDialogTemplates[0] || null);
+                    oDialogModel.setProperty("/documentName", this._buildDefaultDocumentName(aDialogTemplates[0], oContext));
+                }.bind(this)
+            });
+
+            const oDocumentNameInput = new Input({
+                value: "{createDoc>/documentName}",
+                placeholder: "Nombre del documento"
+            });
+            oDocumentNameInput.setModel(oDialogModel, "createDoc");
+
+            const oSelectedTitle = new Text({
+                text: "{= ${createDoc>/selectedTemplate/name} || 'Selecciona una plantilla' }"
+            });
+            oSelectedTitle.setModel(oDialogModel, "createDoc");
+
+            const oSelectedDescription = new Text({
+                text: "{= ${createDoc>/selectedTemplate/description} || 'El panel mostrará metadata, versión, estado, variables y coincidencia de contexto.' }"
+            });
+            oSelectedDescription.setModel(oDialogModel, "createDoc");
+
+            const oDialog = new Dialog({
+                title: "Crear documento a partir de plantilla",
+                contentWidth: "980px",
+                contentHeight: "760px",
+                verticalScrolling: true,
+                resizable: true,
+                draggable: true,
+                content: [
+                    new VBox({
+                        items: [
+                            new ObjectStatus({
+                                text: "Transacción " + oContext.legalTransactionId + " · " + oContext.context + (oContext.category ? " · " + oContext.category : ""),
+                                state: "Information"
+                            }).addStyleClass("sapUiSmallMarginBottom"),
+                            oSearchInput,
+                            new HBox({
+                                wrap: "Wrap",
+                                items: [
+                                    new ObjectStatus({ text: "Contexto: " + (oContext.context || "N/D"), state: "Information" }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new ObjectStatus({ text: "Categoría: " + (oContext.category || "Todas"), state: "Information" }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new ObjectStatus({ text: "Perfil: " + (oContext.profile || "N/D"), state: "Warning" })
+                                ]
+                            }).addStyleClass("sapUiSmallMarginTop sapUiSmallMarginBottom"),
+                            new HBox({
+                                width: "100%",
+                                items: [
+                                    new VBox({ width: "55%", items: [new Title({ text: "Plantillas disponibles", level: "H4" }), oList] }).addStyleClass("sapUiSmallMarginEnd"),
+                                    new VBox({
+                                        width: "45%",
+                                        items: [
+                                            new Title({ text: "Detalle de plantilla", level: "H4" }),
+                                            oSelectedTitle,
+                                            oSelectedDescription,
+                                            new Text({ text: "Campos automáticos: contexto, categoría, contract ID y perfil se enviarán al formulario dinámico." }).addStyleClass("sapUiSmallMarginTop"),
+                                            new Label({ text: "Nombre del documento" }).addStyleClass("sapUiSmallMarginTop"),
+                                            oDocumentNameInput
+                                        ]
+                                    }).addStyleClass("gpcEcmCard")
+                                ]
+                            })
+                        ]
+                    }).addStyleClass("gpcContractFormContent")
+                ],
+                beginButton: new Button({
+                    text: "Crear documento",
+                    type: "Emphasized",
+                    icon: "sap-icon://add-document",
+                    press: async function () {
+                        const oTemplate = oDialogModel.getProperty("/selectedTemplate");
+
+                        if (!oTemplate) {
+                            MessageBox.warning("Selecciona una plantilla.");
+                            return;
+                        }
+
+                        oDialog.close();
+                        const oVariablesInfo = await this._loadTemplateVariables(oTemplate.templateId);
+                        this._openDynamicFormDialog(oTemplate, oVariablesInfo.variables || []);
+                    }.bind(this)
+                }),
+                endButton: new Button({
+                    text: "Cancelar",
+                    press: function () { oDialog.close(); }
+                }),
+                afterClose: function () { oDialog.destroy(); }
+            });
+
+            oDialog.open();
+        },
+
+        _buildDefaultDocumentName: function (oTemplate, oContext) {
+            if (!oTemplate) {
+                return "";
+            }
+
+            return [
+                oContext.legalTransactionId || "CONTRATO",
+                oTemplate.contractType || oTemplate.name,
+                oTemplate.version || "v000"
+            ].join("_");
+        },
+
+        onDocumentAction: function (oEvent) {
+            const oContext = this._getContextFromEvent(oEvent);
+
+            if (!oContext) {
+                return;
+            }
+
+            this._openDocumentDetailDialog(oContext.getObject());
+        },
+
+        onDocumentPreview: function (oEvent) {
+            const oContext = this._getContextFromEvent(oEvent);
+
+            if (oContext) {
+                this._previewRepositoryFile(oContext.getObject());
+            }
+        },
+
+        onDocumentDownload: function (oEvent) {
+            const oContext = this._getContextFromEvent(oEvent);
+
+            if (oContext) {
+                this._downloadRepositoryFile(oContext.getObject());
+            }
+        },
+
+        onDocumentEdit: function (oEvent) {
+            const oContext = this._getContextFromEvent(oEvent);
+
+            if (oContext) {
+                this._editRepositoryFile(oContext.getObject());
+            }
+        },
+
+        onRefreshVirtualDocument: async function () {
+            await this._refreshVirtualDocument({
+                setBusy: function () {}
+            });
+        },
+
+        _openDocumentDetailDialog: function (oItem) {
+            const oModel = this.getView().getModel("app");
+            oModel.setProperty("/selectedDocument", oItem);
+
+            const oInfoTab = new IconTabFilter({
+                text: "Información de documento",
+                content: [new VBox({
+                    items: [
+                        new Text({ text: "Tipo de archivo: " + (oItem.fileType || oItem.extension || "N/D") }),
+                        new Text({ text: "Idioma: " + (oItem.language || "es") }),
+                        new Text({ text: "Tipo de contenido: " + (oItem.contentType || "N/D") }),
+                        new Text({ text: "Legislación aplicable: DO" }),
+                        new Text({ text: "Número de versión: " + (oItem.version || "N/D") }),
+                        new Text({ text: "Fecha de creación/modificación: " + (oItem.modifiedAt || "N/D") }),
+                        new Text({ text: "Creado por: GPC Legal" }),
+                        new Text({ text: "Modificado por: GPC Legal" }),
+                        new Text({ text: "Template source: " + (oItem.relativePath || "N/D") }),
+                        new Text({ text: "Contract number: " + ((oModel.getProperty("/appContext") || {}).legalTransactionId || "N/D") }),
+                        new Text({ text: "Estado de ensamblaje: " + (oItem.assemblyStatus || "N/D") })
+                    ]
+                }).addStyleClass("sapUiSmallMargin")]
+            });
+            const fnPlaceholderTab = function (sText) {
+                return new IconTabFilter({
+                    text: sText,
+                    content: [new Text({ text: sText + " preparado como placeholder visual para una iteración posterior." }).addStyleClass("sapUiSmallMargin")]
+                });
+            };
+            const oDialog = new Dialog({
+                title: oItem.name || "Detalle de documento",
+                contentWidth: "900px",
+                contentHeight: "650px",
+                resizable: true,
+                draggable: true,
+                content: [
+                    new VBox({
+                        items: [
+                            new ObjectStatus({ text: "Estado: " + (oItem.status || "N/D"), state: oItem.statusState || "Information" }).addStyleClass("sapUiSmallMarginBottom"),
+                            new HBox({
+                                wrap: "Wrap",
+                                items: [
+                                    new Button({ text: "Descargar", icon: "sap-icon://download", press: function () { this._downloadRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Preview", icon: "sap-icon://show", press: function () { this._previewRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Editar", icon: "sap-icon://edit", press: function () { this._editRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Refrescar variables SAP", icon: "sap-icon://refresh", press: this.onRefreshVirtualDocument.bind(this) })
+                                ]
+                            }).addStyleClass("sapUiSmallMarginBottom"),
+                            new IconTabBar({
+                                items: [
+                                    oInfoTab,
+                                    fnPlaceholderTab("Categorías"),
+                                    fnPlaceholderTab("Historial de versión"),
+                                    fnPlaceholderTab("Información de plantilla"),
+                                    fnPlaceholderTab("Notas"),
+                                    fnPlaceholderTab("e-Signature"),
+                                    fnPlaceholderTab("Obligaciones")
+                                ]
+                            })
+                        ]
+                    }).addStyleClass("gpcContractFormContent")
+                ],
+                endButton: new Button({ text: "Cerrar", press: function () { oDialog.close(); } }),
+                afterClose: function () { oDialog.destroy(); }
+            });
+
+            oDialog.open();
         },
 
         onRepositoryItemPress: function (oEvent) {
@@ -907,7 +1450,8 @@ sap.ui.define([
                 value: null
             };
 
-            const sDefaultContractNumber = "900000000001";
+            const oAppContext = this.getView().getModel("app").getProperty("/appContext") || {};
+            const sDefaultContractNumber = oAppContext.legalTransactionId || "900000000001";
 
             const aFormVariables = (aVariables || [])
                 .filter(function (oVariable) {
@@ -924,14 +1468,14 @@ sap.ui.define([
             });
 
             oFormBox.addItem(new ObjectStatus({
-                text: "Plantilla: " + oTemplate.name,
+                text: "Plantilla: " + oTemplate.name + " · Contexto: " + (oAppContext.context || "N/D") + " · Categoría: " + (oAppContext.category || "Todas"),
                 state: "Success"
             }).addStyleClass("sapUiSmallMarginBottom"));
 
             oFormBox.addItem(new Title({
-                text: "Consulta de contrato SAP",
+                text: "1. Datos de contrato SAP/mock",
                 level: "H4"
-            }).addStyleClass("sapUiSmallMarginTop"));
+            }).addStyleClass("sapUiSmallMarginTop gpcContractSectionHeader"));
 
             oFormBox.addItem(new Text({
                 text: "Ingresa el ID del contrato SAP para autocompletar los datos del formulario. Si el servicio real no está disponible, se utilizará un mock de respaldo."
@@ -1037,20 +1581,20 @@ sap.ui.define([
                 }.bind(this));
             }.bind(this);
 
-            addSection("Datos del contratista", [
+            addSection("2. Variables SAP · Datos del contratista", [
                 "CONTRACTOR_NAME",
                 "CONTRACTOR_ID",
                 "CONTRACTOR_ADDRESS",
                 "CONTRACTOR_EMAIL"
             ]);
 
-            addSection("Datos comerciales del contrato", [
+            addSection("2. Variables SAP · Datos comerciales", [
                 "CONTRACT_PURPOSE",
                 "CONTRACT_AMOUNT",
                 "CONTRACT_CURRENCY"
             ]);
 
-            addSection("Vigencia", [
+            addSection("2. Variables SAP · Vigencia", [
                 "START_DATE",
                 "END_DATE"
             ]);
@@ -1075,7 +1619,21 @@ sap.ui.define([
                     return !aKnownVariables.includes(sVariableName);
                 });
 
-            addSection("Otros datos requeridos por la plantilla", aOtherVariables);
+            addSection("3. Campos a completar por usuario", aOtherVariables);
+
+            oFormBox.addItem(new Title({
+                text: "4. Documento virtual",
+                level: "H4"
+            }).addStyleClass("sapUiMediumMarginTop sapUiSmallMarginBottom gpcContractSectionHeader"));
+            oFormBox.addItem(new ObjectStatus({
+                text: "Status inicial: PENDING · El refresh recalcula metadata SAP/mock sin regenerar DOCX/PDF.",
+                state: "Information"
+            }));
+
+            oFormBox.addItem(new Title({
+                text: "5. Acciones",
+                level: "H4"
+            }).addStyleClass("sapUiMediumMarginTop sapUiSmallMarginBottom gpcContractSectionHeader"));
             const oDialogContent = new VBox({
                 width: "100%",
                 items: [oFormBox]
@@ -1404,7 +1962,10 @@ sap.ui.define([
             try {
                 const oRepository = await this._fetchJson(sApiBaseUrl + "/api/repository");
 
-                oModel.setProperty("/repositoryTree", this._prepareTree(oRepository.tree || []));
+                const aPreparedTree = this._prepareTree(oRepository.tree || []);
+
+                oModel.setProperty("/repositoryTree", aPreparedTree);
+                oModel.setProperty("/documents", this._buildDocumentRows(aPreparedTree));
                 oModel.setProperty("/backendStatus", "Backend conectado");
                 oModel.setProperty("/backendStatusState", "Success");
             } catch (oError) {
@@ -1435,6 +1996,10 @@ sap.ui.define([
                 metadataText: "Descargar metadata JSON",
                 metadataUrl: sApiBaseUrl + oResult.downloadUrls.metadata
             });
+
+            if (oResult.result && oResult.result.metadata && oResult.result.metadata.virtualDocument) {
+                oModel.setProperty("/virtualDocument", oResult.result.metadata.virtualDocument);
+            }
         },
 
         _showGenerationDialog: function (oResult) {
@@ -1538,6 +2103,11 @@ sap.ui.define([
                 );
                 oDialog.setBusy(false);
                 this._lastGenerationContext.values = oResult.values || oContext.values;
+
+                if (oResult.virtualDocument) {
+                    this.getView().getModel("app").setProperty("/virtualDocument", oResult.virtualDocument);
+                }
+
                 MessageBox.information(
                     (oResult.message || "Variables refrescadas") +
                     "\n\nEstado: " +
