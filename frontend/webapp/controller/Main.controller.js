@@ -1442,8 +1442,8 @@ sap.ui.define([
             const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
             const oVirtualDocument =
                 oResult.result &&
-                oResult.result.metadata &&
-                oResult.result.metadata.virtualDocument
+                    oResult.result.metadata &&
+                    oResult.result.metadata.virtualDocument
                     ? oResult.result.metadata.virtualDocument
                     : null;
             const aMessages = oVirtualDocument ? oVirtualDocument.messages || [] : [];
@@ -1653,10 +1653,15 @@ sap.ui.define([
                 ].join("");
             }.bind(this)).join("");
 
+            const sInitialHtmlContent =
+                sHtmlContent && String(sHtmlContent).trim()
+                    ? String(sHtmlContent)
+                    : "<p>Sin contenido para editar.</p>";
+
             const oRichTextEditor = new RichTextEditor({
                 width: "100%",
                 height: "62vh",
-                value: sHtmlContent || "<p>Sin contenido para editar.</p>",
+                value: "",
                 showGroupFont: true,
                 showGroupTextAlign: true,
                 showGroupStructure: true,
@@ -1665,6 +1670,27 @@ sap.ui.define([
             });
 
             this._rteEditors[sEditorId] = oRichTextEditor;
+
+            const fnApplyInitialEditorContent = function () {
+                const sCurrentValue = oRichTextEditor.getValue && oRichTextEditor.getValue();
+
+                if (sCurrentValue && String(sCurrentValue).trim()) {
+                    return;
+                }
+
+                oRichTextEditor.setValue(sInitialHtmlContent);
+
+                const oNativeEditor =
+                    oRichTextEditor.getNativeApi && oRichTextEditor.getNativeApi();
+
+                if (oNativeEditor && typeof oNativeEditor.setContent === "function") {
+                    oNativeEditor.setContent(sInitialHtmlContent);
+                }
+            };
+
+            if (typeof oRichTextEditor.attachReady === "function") {
+                oRichTextEditor.attachReady(fnApplyInitialEditorContent);
+            }
 
             const oEditorActions = new HBox({
                 wrap: "Wrap",
@@ -1775,6 +1801,8 @@ sap.ui.define([
                     }
                 }),
                 afterOpen: function () {
+                    setTimeout(fnApplyInitialEditorContent, 0);
+                    setTimeout(fnApplyInitialEditorContent, 250);
                     const oSearch = document.getElementById(sClauseSearchId);
                     const oCategory = document.getElementById(sClauseCategoryId);
                     const oStatus = document.getElementById(sClauseStatusId);
@@ -2157,6 +2185,13 @@ sap.ui.define([
             const oRichTextEditor = this._rteEditors[sEditorId];
 
             if (oRichTextEditor) {
+                const oNativeEditor =
+                    oRichTextEditor.getNativeApi && oRichTextEditor.getNativeApi();
+
+                if (oNativeEditor && typeof oNativeEditor.getContent === "function") {
+                    return oNativeEditor.getContent() || "";
+                }
+
                 return oRichTextEditor.getValue() || "";
             }
 
