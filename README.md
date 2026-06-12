@@ -48,34 +48,33 @@ No es todavia un reemplazo productivo de SAP Enterprise Contract Assembly (ECA).
 `-- package.json
 ```
 
-## Flujo funcional de demo
+## Navegación y flujo recomendado de demo
+
+La pantalla principal usa estos términos UX oficiales para mantener el MVP interno coherente:
+
+1. **Resumen**: explica la transacción legal, el **contexto documental**, la categoría, el **perfil simulado** y el estado general.
+2. **Documentos**: muestra documentos de negocio asociados a la transacción, con acciones de vista previa, descarga, edición RichText, detalle y selección para ensamblaje.
+3. **Plantillas**: catálogo filtrable por contexto, categoría, estado, tipo documental, ley aplicable, idioma y perfil simulado.
+4. **Cláusulas**: biblioteca reutilizable de cláusulas; cuando sea útil se menciona como cláusula (text block) para alinear con SAP ECA.
+5. **Ensamblaje**: vista del **documento virtual**, sus mensajes, **Variables SAP** y **Campos de usuario**. El refresco actualiza valores SAP/mock y metadata, pero no regenera automáticamente DOCX/PDF.
+6. **Repositorio técnico**: árbol de archivos internos, versiones, salidas generadas, firmados y evidencias. No sustituye la vista de documentos de negocio.
+
+Flujo recomendado de demo:
 
 1. Levantar backend y frontend.
-2. Abrir la app SAPUI5.
-3. Seleccionar una plantilla del repositorio.
-4. Ver variables requeridas.
-5. Consultar un Contract ID en SAP OData o mock.
-6. Autocompletar el formulario dinamico.
-7. Generar DOCX/PDF.
-8. Revisar el repositorio de archivos.
-9. Previsualizar o descargar documentos.
-10. Editar la representacion HTML, insertar clausulas y guardar nuevas versiones HTML o Word.
+2. Abrir **Resumen** y confirmar transacción, contexto documental, categoría y perfil simulado.
+3. Ir a **Plantillas**, revisar filtros y escoger una plantilla recomendada.
+4. Ver variables requeridas y consultar el ID de contrato en SAP OData o mock.
+5. Completar campos de usuario cuando aplique.
+6. Generar DOCX/PDF.
+7. Revisar el documento en **Documentos**; probar vista previa, descarga, detalle y edición RichText.
+8. Insertar una cláusula desde la biblioteca y guardar una nueva versión HTML o Word.
+9. Seleccionar el documento para **Ensamblaje** y refrescar Variables SAP si se quiere validar el documento virtual.
+10. Usar **Repositorio técnico** solo para inspección técnica de carpetas y archivos.
 
+El botón **Crear documento** ofrece **Cargar archivo** (placeholder visual para iteración posterior) y **Crear a partir de plantilla**. El flujo de plantilla abre un diálogo con contexto/categoría/perfil autocompletados, buscador, plantillas recomendadas y reutiliza el formulario dinámico existente para consultar SAP/mock y generar DOCX/PDF.
 
-## UI tipo SAP ECM/ECA y flujo documental
-
-La pantalla principal se organiza en tabs SAPUI5 para acercar la experiencia al modelo SAP ECM/ECA sin copiar HTML plano del mockup de referencia:
-
-1. **Información general**: contexto de la transacción legal, categoría, Contract ID, estado, responsable y perfil simulado.
-2. **Documentos**: tab principal con tabla de documentos generados/relevantes del repositorio, acciones de preview, descarga, edición RichText y acceso a detalle.
-3. **Plantillas**: catálogo filtrable con metadata, estado, versión, owner, ley aplicable, idioma y acciones existentes de variables, propiedades/lifecycle y uso de plantilla.
-4. **Cláusulas**: biblioteca de text blocks con filtros y acceso al gestor actual de lifecycle/versiones/variantes.
-5. **Documento virtual**: estado, mensajes, variables SAP e input fields del último documento generado o refrescado. El refresh recalcula metadata/valores SAP/mock, pero todavía no regenera DOCX/PDF.
-6. **Repositorio**: árbol local actual para preview, descarga y edición.
-
-El botón **Crear documento** ofrece las acciones **Cargar archivo** (placeholder visual para iteración posterior) y **Crear a partir de plantilla**. El flujo de plantilla abre un diálogo con contexto/categoría/perfil autocompletados, buscador, plantillas recomendadas y reutiliza el formulario dinámico existente para consultar SAP/mock y generar DOCX/PDF.
-
-## Modelo de contexto, categoria y perfil simulado
+## Modelo de contexto, categoría y perfil simulado
 
 El frontend crea un modelo JSON local en `app>/appContext` con valores por defecto:
 
@@ -91,20 +90,20 @@ El frontend crea un modelo JSON local en `app>/appContext` con valores por defec
 }
 ```
 
-La app esta preparada para recibir datos de un paso anterior mediante query params:
+La app acepta datos de un paso anterior mediante query params:
 
 ```text
 ?contractId=1000000016&context=Arrendamiento&category=Arrendamiento%20de%20inmuebles&profile=LEGAL_USER
 ```
 
-Roles/perfiles simulados actuales:
+Roles/perfiles simulados actuales (no son autenticación real):
 
 - `LEGAL_ADMIN`: ve todas las plantillas.
 - `LEGAL_USER`: ve plantillas no archivadas.
 - `BUSINESS_USER`: ve preferiblemente plantillas `RELEASED` o `APPROVED`.
 - `VIEWER`: ve solo plantillas `RELEASED`.
 
-Pendiente para roles reales: autenticacion, autorizacion centralizada, usuarios reales, asignacion de perfiles desde IdP/SAP y auditoria de decisiones de filtrado.
+Pendiente para roles reales: autenticación, autorización centralizada, usuarios reales, asignación de perfiles desde IdP/SAP y auditoría de decisiones de filtrado.
 
 ## Query params de filtros backend
 
@@ -225,11 +224,11 @@ Cubierto en el MVP interno / prototipo funcional:
 - Gestion basica de plantillas en repositorio local.
 - Metadatos ligeros de plantillas en `GET /api/templates`: `contentType`, `categories`, `governingLaw`, `language`, `description`, `validFrom`, `validTo`, `owner`, `revision`, `replacedBy` y `availableActions`.
 - Estados normalizados de plantillas: `DRAFT`, `SENT_FOR_APPROVAL`, `APPROVED`, `RELEASED`, `EXPIRED`, `REPLACED`, `ARCHIVED`.
-- Acciones reales de lifecycle para plantillas: enviar a aprobacion, aprobar, liberar, aprobar+liberar, reabrir, archivar, crear nueva version y restaurar.
+- Acciones reales de estado para plantillas: enviar a aprobacion, aprobar, liberar, aprobar+liberar, reabrir, archivar, crear nueva version y restaurar.
 - Text Block Library ligera con metadata, estados, acciones, versionado y variantes para clausulas HTML.
 - Separacion de text elements en `SAP_VARIABLE`/`VARIABLE` e `USER_INPUT`/`INPUT_FIELD`.
-- Metadata de documento virtual en generacion: estado, mensajes, input fields, variables y refresh SAP/mock sin regenerar DOCX/PDF.
-- Variables/input fields por marcadores `{VARIABLE}`.
+- Metadata de documento virtual en generacion: estado, mensajes, campos de usuario, variables y refresh SAP/mock sin regenerar DOCX/PDF.
+- Variables/campos de usuario por marcadores `{VARIABLE}`.
 - Autollenado desde SAP/mock.
 - Biblioteca simple de clausulas.
 - Generacion/exportacion DOCX y PDF.
@@ -243,8 +242,8 @@ Parcialmente cubierto:
 - Estados simples en nombres de archivo, como `BORRADOR` y `APROBADO`, normalizados al modelo ECA ligero.
 - Aprobacion/release existe como sidecar local; todavia no hay usuarios, roles ni workflow real.
 - Insercion manual de clausulas en documentos.
-- Preview y edicion HTML como aproximacion a documentos virtuales.
-- Refresh Document actualiza valores y estado, pero no regenera automaticamente el DOCX/PDF.
+- Vista previa y edicion HTML como aproximacion a documentos virtuales.
+- Refresh Document / refresco de documento virtual actualiza valores y estado, pero no regenera automaticamente el DOCX/PDF.
 
 Backlog funcional frente a ECA:
 
@@ -252,8 +251,8 @@ Backlog funcional frente a ECA:
 - Historial formal de versiones y marcado de versiones reemplazadas.
 - Bloquear uso productivo de plantillas no `RELEASED`; hoy solo se advierte.
 - Text Block Library avanzada con clases Clause y Signature Block administradas desde UI completa.
-- Versiones, variantes y estados de text blocks.
-- Edicion centralizada de text blocks.
+- Versiones, variantes y estados de cláusulas (text blocks).
+- Edicion centralizada de cláusulas (text blocks).
 - Template rules y text block rules.
 - Condiciones If / Else If / Else con expresiones y acciones.
 - Alternativas con risk level: Low, Medium, High, Very High.
@@ -264,7 +263,7 @@ Backlog funcional frente a ECA:
 - Template rules y text block rules: `canRemove`, `fixedPosition`.
 - Conditions con expresiones y acciones de insertar, reemplazar o remover bloques.
 - Alternatives por text block con risk level `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
-- Virtual documents con estados `PENDING`, `ERROR`, `COMPLETED`, `FINAL` y accion Refresh Document.
+- Virtual documents con estados `PENDING`, `ERROR`, `COMPLETED`, `FINAL` y accion Refresh Document / refresco de documento virtual.
 - Persistencia real para metadatos, documentos y auditoria.
 - Seguridad/autorizacion por rol.
 - Sanitizacion y redaccion de logs sensibles.
@@ -306,9 +305,9 @@ Campos soportados por ahora:
 }
 ```
 
-Las acciones de lifecycle escriben este sidecar. `CREATE_NEW_VERSION` copia el archivo actual a la siguiente version `v###`, deja la nueva en `DRAFT` y marca la anterior como `REPLACED`.
+Las acciones de estado escriben este sidecar. `CREATE_NEW_VERSION` copia el archivo actual a la siguiente version `v###`, deja la nueva en `DRAFT` y marca la anterior como `REPLACED`.
 
-## Metadata de cláusulas / text blocks
+## Metadata de cláusulas (text blocks)
 
 Las clausulas usan la convencion:
 
@@ -354,7 +353,7 @@ La generacion guarda metadata de documento virtual:
 
 ## API de documentos de negocio
 
-La vista **Documentos** consume `GET /api/documents` para evitar mostrar el repositorio técnico como un dump de archivos. La tab muestra una fila por documento lógico y reserva `GET /api/repository` para la tab **Repositorio**.
+La vista **Documentos** consume `GET /api/documents` para evitar mostrar el repositorio técnico como un dump de archivos. La tab muestra una fila por documento lógico y reserva `GET /api/repository` para la tab **Repositorio técnico**.
 
 Parámetros soportados:
 

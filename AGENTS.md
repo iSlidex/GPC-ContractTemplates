@@ -15,7 +15,7 @@ Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly cl
 
 ## Current known flows
 
-- Main UI is organized into SAP ECM/ECA-inspired tabs: General Information, Documents, Templates, Clauses, Virtual Document, and Repository.
+- Main UI is organized into SAP ECM/ECA-inspired tabs using official UX terms: Resumen, Documentos, Plantillas, Cláusulas, Ensamblaje, and Repositorio técnico.
 - The frontend owns a local `appContext` model for legal transaction id/name, context, category, simulated profile/roles, and role-filter flags. Query params `contractId`, `context`, `category`, and `profile` can override defaults.
 - Roles are simulated only (`LEGAL_ADMIN`, `LEGAL_USER`, `BUSINESS_USER`, `VIEWER`); do not implement real authentication unless explicitly requested.
 - Template and clause list endpoints accept optional query filters while preserving no-query compatibility.
@@ -26,11 +26,23 @@ Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly cl
 - Generate documents with `POST /api/templates/:templateId/generate`.
 - Manage template metadata with `GET /api/templates/:templateId`, `PATCH /api/templates/:templateId/metadata`, and `POST /api/templates/:templateId/actions/:action`.
 - Refresh virtual document variables with `POST /api/virtual-documents/refresh`.
-- Browse curated business documents with `GET /api/documents`.
-- Browse repository with `GET /api/repository`.
+- Browse curated business documents with `GET /api/documents` (business-facing Documentos tab).
+- Browse the technical file repository with `GET /api/repository` (Repositorio técnico tab only).
 - Preview/download files through `/api/files/*`.
 - Edit DOCX/HTML as HTML and save HTML or DOCX versions.
-- Load clauses with `GET /api/clauses`, manage clause metadata/actions/version/variant, and insert text blocks in the rich text editor.
+- Load clauses with `GET /api/clauses`, manage clause metadata/actions/version/variant, and insert cláusulas (text blocks) in the RichText editor.
+
+
+## UX language and validation rules
+
+- Official UX terms: Resumen, Documentos, Plantillas, Cláusulas, Ensamblaje, Repositorio técnico, Documento virtual, Variables SAP, Campos de usuario, Perfil simulado, Contexto documental.
+- Use "text block" only when needed for SAP ECA alignment, and pair it with "cláusula" (for example, "cláusula (text block)").
+- Do not expose raw JavaScript objects, `[object Object]`, raw lifecycle jargon, or generic messages without a suggested user action.
+- Every empty state must explain: what is missing, why it may be empty, and what the user can do next.
+- Distinguish business documents (`/api/documents`, **Documentos**) from the technical repository tree (`/api/repository`, **Repositorio técnico**). Do not present the repository tree as the business document list.
+- Do not break RichText editing: existing content must load, clause insertion must preserve editor content, page preview must render, and saving HTML/DOCX versions must remain functional.
+- Badge colors should stay consistent: DRAFT/PENDING orange, SENT_FOR_APPROVAL/GENERATED blue, APPROVED/COMPLETED green, RELEASED/FINAL strong green, ARCHIVED gray, REPLACED gray-blue, ERROR red.
+- Required validation after frontend/controller changes: `node --check frontend/webapp/controller/Main.controller.js`; after backend JS changes: `find backend/src -name "*.js" -print0 | xargs -0 -n1 node --check`; validate `/health` when feasible.
 
 ## Development commands
 
@@ -94,10 +106,10 @@ For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
 - Templates live under `backend/repository/templates/`.
 - Template metadata is derived from `TPL_<category>_<contractType>_<version>_<status>` and may be enriched with an adjacent `<templateBaseName>.metadata.json` sidecar.
 - Keep template statuses normalized to `DRAFT`, `SENT_FOR_APPROVAL`, `APPROVED`, `RELEASED`, `EXPIRED`, `REPLACED`, `ARCHIVED`.
-- Any future lifecycle endpoint must validate transitions in backend lifecycle helpers before mutating metadata.
+- Any future state-transition endpoint must validate transitions in backend lifecycle helpers before mutating metadata.
 - Clauses live under `backend/repository/clauses/`.
 - Clause metadata is derived from `CLA_<category>_<title>_<version>_<status>` and may be enriched with an adjacent `<clauseBaseName>.metadata.json` sidecar.
-- Clause lifecycle actions must also validate transitions in backend helpers.
+- Clause state-transition actions must also validate transitions in backend helpers.
 - Generated outputs live under `backend/repository/generated/`.
 - Signed documents and evidence should live under `backend/repository/signed/` and `backend/repository/evidence/`.
 - Do not commit generated documents, generated PDFs, signed files, evidence, or local output folders.
@@ -107,19 +119,19 @@ For no real SAP access, run the backend with `SAP_ODATA_FORCE_MOCK=true`.
 
 Use SAP Enterprise Contract Assembly concepts as a functional reference:
 
-- Templates: metadata, versions, lifecycle states, approval/release, Word export.
-- Text blocks: clause/signature block library, metadata, variables, input fields, versions, variants, states.
+- Templates: metadata, versions, state transitions, approval/release, Word export.
+- Clauses (text blocks): clause/signature block library, metadata, variables, user input fields, versions, variants, states.
 - Text elements: keep `SAP_VARIABLE`/`VARIABLE` separate from `USER_INPUT`/`INPUT_FIELD`.
 - Virtual documents: keep status/messages in generation metadata and use refresh endpoint for SAP/mock values.
-- Rules and conditions: template rules, text block rules, If / Else If / Else, insert/replace/remove actions.
-- Alternatives: alternative text blocks with risk levels Low, Medium, High, Very High.
+- Rules and conditions: template rules, clause (text block) rules, If / Else If / Else, insert/replace/remove actions.
+- Alternatives: alternative clauses (text blocks) with risk levels Low, Medium, High, Very High.
 - Virtual documents: generated or assembled document states and refresh behavior.
 
 Document these as alignment/backlog unless the user explicitly asks to implement them.
 
 ## Technical backlog
 
-- Add template rules and text block rules such as `canRemove` and `fixedPosition`.
+- Add template rules and clause (text block) rules such as `canRemove` and `fixedPosition`.
 - Add conditions with expressions and insert/replace/remove actions.
 - Add alternatives with risk levels `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
 - Add virtual document states `PENDING`, `ERROR`, `COMPLETED`, `FINAL` and Refresh Document behavior.

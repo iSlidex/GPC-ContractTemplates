@@ -582,3 +582,79 @@
   padding: 3rem 1.5rem;
   text-align: center;
 }
+
+.gpcReadableTable .sapMListTblCell {
+  vertical-align: top;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+
+.gpcEmptyStateBox {
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px dashed #b8c7d6;
+  border-radius: 0.65rem;
+  background: #f8fafc;
+}
+
+.gpcStatusBadge .sapMObjStatusText {
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.gpcStatusDraft .sapMObjStatusText,
+.gpcStatusPending .sapMObjStatusText {
+  background: #fff3cd;
+  color: #8a5a00 !important;
+}
+
+.gpcStatusSentForApproval .sapMObjStatusText,
+.gpcStatusGenerated .sapMObjStatusText {
+  background: #e7f0fa;
+  color: #0a6ed1 !important;
+}
+
+.gpcStatusApproved .sapMObjStatusText,
+.gpcStatusCompleted .sapMObjStatusText {
+  background: #e4f5e9;
+  color: #107e3e !important;
+}
+
+.gpcStatusReleased .sapMObjStatusText,
+.gpcStatusFinal .sapMObjStatusText {
+  background: #d7f4df;
+  color: #0b6b35 !important;
+}
+
+.gpcStatusArchived .sapMObjStatusText {
+  background: #eef1f4;
+  color: #5b6673 !important;
+}
+
+.gpcStatusReplaced .sapMObjStatusText {
+  background: #e7edf5;
+  color: #35516d !important;
+}
+
+.gpcStatusError .sapMObjStatusText {
+  background: #fde7e9;
+  color: #bb0000 !important;
+}
+
+.gpcDangerButton .sapMBtnInner {
+  border-color: #bb0000 !important;
+  color: #bb0000 !important;
+}
+
+@media (max-width: 72rem) {
+  .gpcReadableTable .sapMListTblHeaderCell,
+  .gpcReadableTable .sapMListTblCell {
+    min-width: 8rem;
+  }
+
+  .gpcHeaderActions {
+    margin-top: 0.75rem;
+  }
+}
