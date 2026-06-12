@@ -98,7 +98,15 @@ sap.ui.define([
                 selectedDocument: null,
                 templateSummary: { total: 0, recommended: 0, hiddenByRole: 0 },
                 summary: { generatedDocuments: 0, recommendedTemplates: 0, availableClauses: 0, lastAssembly: "Pendiente", lastDataSource: "Sin consulta SAP/mock realizada.", hasVirtualDocument: false },
-                virtualDisplay: { messages: [], variables: [], inputFields: [] },
+                virtualDisplay: {
+                    hasActiveDocument: false,
+                    emptyMessage: "No hay documento virtual seleccionado.",
+                    emptyDescription: "Selecciona un documento generado o crea un documento desde una plantilla para iniciar el ensamblaje.",
+                    header: {},
+                    messages: [],
+                    variables: [],
+                    inputFields: []
+                },
                 hasGenerationResult: false,
                 generationMessage: "",
                 lastGeneration: {
@@ -109,12 +117,7 @@ sap.ui.define([
                     metadataText: "",
                     metadataUrl: ""
                 },
-                virtualDocument: {
-                    status: "PENDING",
-                    messages: ["Aún no se ha generado documento virtual en esta sesión."],
-                    variables: {},
-                    inputFields: {}
-                }
+                virtualDocument: null
             });
 
             this.getView().setModel(oModel, "app");
@@ -830,6 +833,10 @@ sap.ui.define([
             this.byId("mainTabs").setSelectedKey("templates");
         },
 
+        onGoToVirtualAssembly: function () {
+            this.byId("mainTabs").setSelectedKey("virtual");
+        },
+
         onCreateDocumentAction: function (oEvent) {
             const sKey = oEvent.getParameter("item") && oEvent.getParameter("item").getKey();
 
@@ -1032,6 +1039,15 @@ sap.ui.define([
             }
         },
 
+        onDocumentAssembly: function (oEvent) {
+            const oContext = this._getContextFromEvent(oEvent);
+
+            if (oContext) {
+                this._selectDocumentForAssembly(oContext.getObject());
+                this.onGoToVirtualAssembly();
+            }
+        },
+
         onLoadMoreDocuments: async function () {
             const oModel = this.getView().getModel("app");
             const aCurrent = oModel.getProperty("/documents") || [];
@@ -1048,6 +1064,46 @@ sap.ui.define([
             await this._refreshVirtualDocument({
                 setBusy: function () {}
             });
+        },
+
+        onSelectedAssemblyDocumentPreview: function () {
+            const oModel = this.getView().getModel("app");
+            const oSelectedDocument = oModel.getProperty("/selectedDocument");
+            const oVirtualDisplay = oModel.getProperty("/virtualDisplay/header") || {};
+
+            if (oSelectedDocument) {
+                this._previewRepositoryFile(this._toRepositoryFileItem(oSelectedDocument));
+                return;
+            }
+
+            if (oVirtualDisplay.documentPath) {
+                this._previewRepositoryFile({
+                    relativePath: oVirtualDisplay.documentPath,
+                    extension: oVirtualDisplay.documentPath.slice(oVirtualDisplay.documentPath.lastIndexOf("."))
+                });
+                return;
+            }
+
+            const sDocxUrl = oModel.getProperty("/lastGeneration/docxUrl");
+
+            if (sDocxUrl) {
+                window.open(sDocxUrl, "_blank");
+                return;
+            }
+
+            MessageBox.warning("No hay archivo de documento disponible para previsualizar.");
+        },
+
+        onSelectedAssemblyDocumentDetail: function () {
+            const oSelectedDocument = this.getView().getModel("app").getProperty("/selectedDocument");
+
+            if (oSelectedDocument) {
+                this._openDocumentDetailDialog(oSelectedDocument);
+                return;
+            }
+
+            this.onGoToDocuments();
+            MessageToast.show("Selecciona un documento de la lista para abrir su detalle.");
         },
 
         _createRelatedFilesTable: function (oDocument) {
@@ -1129,12 +1185,21 @@ sap.ui.define([
                 text: "Archivos relacionados",
                 content: [this._createRelatedFilesTable(oItem)]
             });
+            const oDocumentVirtual = this._buildVirtualDocumentFromDocument(oItem);
             const oVariablesTab = new IconTabFilter({
                 key: "variables",
                 text: "Variables/Input fields",
                 content: [
-                    this._createKeyValueTable("Variables", oItem.variables || [], "No hay variables SAP registradas para este documento."),
-                    this._createKeyValueTable("Input fields", oItem.inputFields || [], "No hay input fields registrados para este documento.")
+                    this._createKeyValueTable(
+                        "Variables SAP",
+                        this._normalizeVariablesForDisplay(oDocumentVirtual.variables || {}, oDocumentVirtual.variableDefinitions || [], oDocumentVirtual.values || {}),
+                        "No hay variables SAP registradas para este documento."
+                    ),
+                    this._createKeyValueTable(
+                        "Input fields",
+                        this._normalizeInputFieldsForDisplay(oDocumentVirtual.inputFields || {}, oDocumentVirtual.variableDefinitions || [], oDocumentVirtual.values || {}),
+                        "No hay input fields registrados para este documento."
+                    )
                 ]
             });
             const oHistoryTab = new IconTabFilter({
@@ -1179,7 +1244,12 @@ sap.ui.define([
                                     new Button({ text: "Descargar", icon: "sap-icon://download", press: function () { this._downloadRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
                                     new Button({ text: "Preview", icon: "sap-icon://show", press: function () { this._previewRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
                                     new Button({ text: "Editar RichText", icon: "sap-icon://edit", press: function () { this._editRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Versiones", icon: "sap-icon://history", press: function () { oTabBar.setSelectedKey("files"); } })
+                                    new Button({ text: "Versiones", icon: "sap-icon://history", press: function () { oTabBar.setSelectedKey("files"); } }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Ver ensamblaje", icon: "sap-icon://synchronize", type: "Emphasized", press: function () {
+                                        this._selectDocumentForAssembly(oItem);
+                                        this.onGoToVirtualAssembly();
+                                        oDialog.close();
+                                    }.bind(this) })
                                 ]
                             }).addStyleClass("sapUiSmallMarginBottom"),
                             oTabBar
@@ -2566,7 +2636,13 @@ sap.ui.define([
             });
 
             if (oResult.result && oResult.result.metadata && oResult.result.metadata.virtualDocument) {
-                oModel.setProperty("/virtualDocument", oResult.result.metadata.virtualDocument);
+                const oVirtualDocument = {
+                    ...oResult.result.metadata.virtualDocument,
+                    values: oResult.result.metadata.values || {},
+                    dataSource: oResult.result.metadata.dataSource || oResult.result.metadata.source || "SAP/mock"
+                };
+                oModel.setProperty("/selectedDocument", null);
+                oModel.setProperty("/virtualDocument", oVirtualDocument);
                 this._syncVirtualDocumentDisplay();
             }
 
@@ -2606,9 +2682,9 @@ sap.ui.define([
                             }).addStyleClass("sapUiSmallMarginBottom"),
 
                             new Text({
-                                text: aMessages.length
-                                    ? aMessages.join("\n")
-                                    : "Sin mensajes de validación."
+                                text: this._normalizeVirtualDocumentMessages(aMessages).map(function (oMessage) {
+                                    return oMessage.severity + ": " + oMessage.message;
+                                }).join("\n")
                             }).addStyleClass("sapUiSmallMarginBottom"),
 
                             new Link({
@@ -2632,7 +2708,7 @@ sap.ui.define([
                     }).addStyleClass("sapUiMediumMargin")
                 ],
                 beginButton: new Button({
-                    text: "Refrescar variables SAP",
+                    text: "Refrescar variables SAP/mock",
                     icon: "sap-icon://refresh",
                     press: async function () {
                         await this._refreshVirtualDocument(oDialog);
@@ -2653,14 +2729,15 @@ sap.ui.define([
         },
 
         _refreshVirtualDocument: async function (oDialog) {
-            const oContext = this._lastGenerationContext;
+            const oModel = this.getView().getModel("app");
+            const oContext = this._getVirtualDocumentRefreshContext();
 
-            if (!oContext) {
-                MessageBox.warning("No hay contexto de generación para refrescar.");
+            if (!oContext || !oContext.templateId || !oContext.contractNumber) {
+                MessageBox.warning("No hay documento virtual activo con templateId y contractNumber para refrescar.");
                 return;
             }
 
-            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+            const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
 
             try {
                 oDialog.setBusy(true);
@@ -2673,20 +2750,29 @@ sap.ui.define([
                     }
                 );
                 oDialog.setBusy(false);
-                this._lastGenerationContext.values = oResult.values || oContext.values;
+
+                this._lastGenerationContext = {
+                    templateId: oContext.templateId,
+                    contractNumber: oContext.contractNumber,
+                    values: oResult.values || oContext.values || {}
+                };
 
                 if (oResult.virtualDocument) {
-                    this.getView().getModel("app").setProperty("/virtualDocument", oResult.virtualDocument);
+                    oModel.setProperty("/virtualDocument", {
+                        ...oResult.virtualDocument,
+                        values: oResult.values || oContext.values || {},
+                        dataSource: oResult.source || oResult.virtualDocument.dataSource || "SAP/mock",
+                        fallback: oResult.fallback,
+                        refreshReason: oResult.reason
+                    });
                     this._syncVirtualDocumentDisplay();
                     this._updateSummaryCards();
                 }
 
+                MessageToast.show("Variables SAP/mock refrescadas");
                 MessageBox.information(
-                    (oResult.message || "Variables refrescadas") +
-                    "\n\nEstado: " +
-                    (oResult.virtualDocument && oResult.virtualDocument.status || "N/D") +
-                    "\n\nMensajes:\n" +
-                    ((oResult.virtualDocument && oResult.virtualDocument.messages || []).join("\n") || "Sin mensajes")
+                    (oResult.message || "Variables SAP/mock refrescadas") +
+                    "\n\nAviso: el refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX/PDF."
                 );
             } catch (oError) {
                 oDialog.setBusy(false);
@@ -2699,21 +2785,53 @@ sap.ui.define([
             }
 
             if (Array.isArray(vValue)) {
-                return vValue.map(function (vItem) { return this._formatValueForDisplay(vItem); }.bind(this)).join(", ");
+                if (!vValue.length) {
+                    return "—";
+                }
+
+                return vValue.length + " elemento(s): " + this._formatCompactJson(vValue);
             }
 
             if (typeof vValue === "object") {
-                try {
-                    return JSON.stringify(vValue);
-                } catch (oError) {
-                    return "Objeto complejo";
-                }
+                return this._formatCompactJson(vValue);
             }
 
             return String(vValue);
         },
 
-        _objectToKeyValueItems: function (vData) {
+        _formatCompactJson: function (vValue) {
+            try {
+                return JSON.stringify(vValue);
+            } catch (oError) {
+                return "Objeto complejo";
+            }
+        },
+
+        _hasDisplayValue: function (vValue) {
+            if (vValue === null || vValue === undefined || vValue === "") {
+                return false;
+            }
+
+            if (Array.isArray(vValue)) {
+                return vValue.length > 0;
+            }
+
+            return true;
+        },
+
+        _toKeyValueRows: function (vData, oOptions) {
+            const oSettings = oOptions || {};
+            const sDefaultType = oSettings.defaultType || "—";
+            const sDefaultSource = oSettings.defaultSource || "—";
+            const mDefinitions = {};
+            const mValues = oSettings.values || {};
+
+            (oSettings.definitions || []).forEach(function (oDefinition) {
+                if (oDefinition && oDefinition.name) {
+                    mDefinitions[oDefinition.name] = oDefinition;
+                }
+            });
+
             if (!vData) {
                 return [];
             }
@@ -2721,26 +2839,240 @@ sap.ui.define([
             if (Array.isArray(vData)) {
                 return vData.map(function (vItem, iIndex) {
                     if (typeof vItem === "object" && vItem !== null) {
+                        const sName = vItem.name || vItem.label || vItem.key || vItem.field || ("Item " + (iIndex + 1));
+                        const vValue = vItem.value !== undefined ? vItem.value : (mValues[sName] !== undefined ? mValues[sName] : "");
+
                         return {
-                            name: vItem.name || vItem.label || vItem.key || ("Item " + (iIndex + 1)),
-                            type: vItem.type || vItem.ecaType || "—",
-                            source: vItem.source || "—",
-                            value: this._formatValueForDisplay(vItem.value !== undefined ? vItem.value : vItem),
-                            status: vItem.status || (vItem.required ? "Requerido" : "—")
+                            name: sName,
+                            type: vItem.type || vItem.ecaType || sDefaultType,
+                            source: vItem.source || sDefaultSource,
+                            required: !!vItem.required,
+                            rawValue: vValue,
+                            value: this._formatValueForDisplay(vValue),
+                            jsonValue: (typeof vValue === "object" && vValue !== null) ? this._formatCompactJson(vValue) : "",
+                            status: vItem.status || (this._hasDisplayValue(vValue) ? (oSettings.completedStatus || "OK") : (oSettings.missingStatus || "Faltante"))
                         };
                     }
 
-                    return { name: "Item " + (iIndex + 1), type: "—", source: "—", value: this._formatValueForDisplay(vItem), status: "—" };
+                    return {
+                        name: "Item " + (iIndex + 1),
+                        type: sDefaultType,
+                        source: sDefaultSource,
+                        required: false,
+                        rawValue: vItem,
+                        value: this._formatValueForDisplay(vItem),
+                        jsonValue: (typeof vItem === "object" && vItem !== null) ? this._formatCompactJson(vItem) : "",
+                        status: this._hasDisplayValue(vItem) ? (oSettings.completedStatus || "OK") : (oSettings.missingStatus || "Faltante")
+                    };
                 }.bind(this));
             }
 
             if (typeof vData === "object") {
                 return Object.keys(vData).map(function (sKey) {
-                    return { name: sKey, type: "—", source: "—", value: this._formatValueForDisplay(vData[sKey]), status: "—" };
+                    const oDefinition = mDefinitions[sKey] || {};
+                    const vValue = vData[sKey];
+
+                    return {
+                        name: sKey,
+                        type: oDefinition.type || oDefinition.ecaType || sDefaultType,
+                        source: oDefinition.source || sDefaultSource,
+                        required: !!oDefinition.required,
+                        rawValue: vValue,
+                        value: this._formatValueForDisplay(vValue),
+                        jsonValue: (typeof vValue === "object" && vValue !== null) ? this._formatCompactJson(vValue) : "",
+                        status: this._hasDisplayValue(vValue) ? (oSettings.completedStatus || "OK") : (oSettings.missingStatus || "Faltante")
+                    };
                 }.bind(this));
             }
 
-            return [{ name: "Valor", type: "—", source: "—", value: this._formatValueForDisplay(vData), status: "—" }];
+            return [{
+                name: "Valor",
+                type: sDefaultType,
+                source: sDefaultSource,
+                required: false,
+                rawValue: vData,
+                value: this._formatValueForDisplay(vData),
+                jsonValue: (typeof vData === "object" && vData !== null) ? this._formatCompactJson(vData) : "",
+                status: this._hasDisplayValue(vData) ? (oSettings.completedStatus || "OK") : (oSettings.missingStatus || "Faltante")
+            }];
+        },
+
+        _objectToKeyValueItems: function (vData) {
+            return this._toKeyValueRows(vData);
+        },
+
+        _normalizeMessageSeverity: function (sSeverity, sMessage) {
+            const sNormalized = String(sSeverity || "").toUpperCase();
+
+            if (["ERROR", "WARNING", "INFO", "SUCCESS"].includes(sNormalized)) {
+                return sNormalized;
+            }
+
+            if (/^faltan|error|obligatorio/i.test(String(sMessage || ""))) {
+                return "ERROR";
+            }
+
+            if (/advertencia|warning/i.test(String(sMessage || ""))) {
+                return "WARNING";
+            }
+
+            return "INFO";
+        },
+
+        _messageSeverityToState: function (sSeverity) {
+            const mStates = { ERROR: "Error", WARNING: "Warning", INFO: "Information", SUCCESS: "Success" };
+            return mStates[sSeverity] || "Information";
+        },
+
+        _normalizeVirtualDocumentMessages: function (vMessages) {
+            if (!vMessages || (Array.isArray(vMessages) && !vMessages.length)) {
+                return [{
+                    severity: "SUCCESS",
+                    severityState: "Success",
+                    message: "Sin mensajes de validación.",
+                    field: "—",
+                    action: "No se requiere acción."
+                }];
+            }
+
+            const aMessages = Array.isArray(vMessages) ? vMessages : [vMessages];
+
+            return aMessages.map(function (vMessage) {
+                if (typeof vMessage === "object" && vMessage !== null) {
+                    const sText = vMessage.message || vMessage.text || vMessage.description || this._formatValueForDisplay(vMessage);
+                    const sSeverity = this._normalizeMessageSeverity(vMessage.severity || vMessage.type || vMessage.level, sText);
+
+                    return {
+                        severity: sSeverity,
+                        severityState: this._messageSeverityToState(sSeverity),
+                        message: sText,
+                        field: vMessage.field || vMessage.fieldName || vMessage.variable || vMessage.name || "—",
+                        action: vMessage.action || vMessage.suggestedAction || this._suggestActionForMessage(sSeverity, sText)
+                    };
+                }
+
+                const sText = this._formatValueForDisplay(vMessage);
+                const sSeverity = this._normalizeMessageSeverity(null, sText);
+
+                return {
+                    severity: sSeverity,
+                    severityState: this._messageSeverityToState(sSeverity),
+                    message: sText,
+                    field: this._extractFieldFromMessage(sText),
+                    action: this._suggestActionForMessage(sSeverity, sText)
+                };
+            }.bind(this));
+        },
+
+        _extractFieldFromMessage: function (sMessage) {
+            const aParts = String(sMessage || "").split(":");
+            return aParts.length > 1 ? aParts.slice(1).join(":").trim() : "—";
+        },
+
+        _suggestActionForMessage: function (sSeverity, sMessage) {
+            if (/variables SAP/i.test(String(sMessage || ""))) {
+                return "Refresca SAP/mock o completa el dato faltante antes de finalizar.";
+            }
+
+            if (/campos de usuario|input/i.test(String(sMessage || ""))) {
+                return "Completa el campo de usuario en la generación o edición del documento.";
+            }
+
+            if (sSeverity === "WARNING") {
+                return "Revisar antes de liberar o enviar a firma.";
+            }
+
+            if (sSeverity === "ERROR") {
+                return "Corregir antes de continuar.";
+            }
+
+            return "No se requiere acción.";
+        },
+
+        _normalizeVariablesForDisplay: function (vVariables, aDefinitions, mValues) {
+            return this._toKeyValueRows(vVariables, {
+                definitions: aDefinitions,
+                values: mValues,
+                defaultType: "Variable",
+                defaultSource: "SAP/mock",
+                completedStatus: "OK",
+                missingStatus: "Faltante"
+            }).map(function (oRow) {
+                return { ...oRow, variable: oRow.name };
+            });
+        },
+
+        _normalizeInputFieldsForDisplay: function (vInputFields, aDefinitions, mValues) {
+            return this._toKeyValueRows(vInputFields, {
+                definitions: aDefinitions,
+                values: mValues,
+                defaultType: "Input field",
+                defaultSource: "Usuario",
+                completedStatus: "Completado",
+                missingStatus: "Pendiente"
+            }).map(function (oRow) {
+                return {
+                    ...oRow,
+                    field: oRow.name,
+                    requiredText: oRow.required ? "Sí" : "No"
+                };
+            });
+        },
+
+        _selectDocumentForAssembly: function (oDocument) {
+            const oModel = this.getView().getModel("app");
+            const oVirtualDocument = this._buildVirtualDocumentFromDocument(oDocument);
+
+            oModel.setProperty("/selectedDocument", oDocument);
+            oModel.setProperty("/virtualDocument", oVirtualDocument);
+            this._lastGenerationContext = {
+                templateId: oVirtualDocument.templateId,
+                contractNumber: oVirtualDocument.contractNumber,
+                values: oVirtualDocument.values || {}
+            };
+            this._syncVirtualDocumentDisplay();
+            this._updateSummaryCards();
+            MessageToast.show("Documento ligado al ensamblaje");
+        },
+
+        _buildVirtualDocumentFromDocument: function (oDocument) {
+            const oVirtual = (oDocument && oDocument.virtualDocument) || {};
+            const mValues = oDocument && oDocument.values || oVirtual.values || {};
+            const mVariables = oVirtual.variables || mValues || {};
+
+            return {
+                ...oVirtual,
+                virtualDocumentId: oVirtual.virtualDocumentId || (oDocument && oDocument.documentId) || "",
+                documentId: oDocument && oDocument.documentId,
+                templateId: oVirtual.templateId || (oDocument && oDocument.templateId) || "",
+                templateVersion: oVirtual.templateVersion || (oDocument && oDocument.templateVersion) || "",
+                contractNumber: oVirtual.contractNumber || (oDocument && oDocument.contractNumber) || "",
+                status: oVirtual.status || (oDocument && oDocument.assemblyStatus) || "PENDING",
+                generatedAt: oVirtual.generatedAt || (oDocument && oDocument.generatedAt) || "",
+                lastRefreshedAt: oVirtual.lastRefreshedAt || "",
+                updatedAt: oVirtual.lastRefreshedAt || oVirtual.generatedAt || (oDocument && (oDocument.modifiedAt || oDocument.generatedAt)) || "",
+                dataSource: oVirtual.dataSource || oVirtual.source || (oDocument && (oDocument.dataSource || oDocument.source)) || "SAP/mock",
+                messages: oVirtual.messages || (oDocument && oDocument.messages) || [],
+                variables: mVariables,
+                inputFields: oVirtual.inputFields || (oDocument && oDocument.inputFields) || {},
+                variableDefinitions: (oDocument && oDocument.variables) || [],
+                values: mValues,
+                primaryFile: oDocument && oDocument.primaryFile,
+                relativePath: oDocument && oDocument.relativePath
+            };
+        },
+
+        _getVirtualDocumentRefreshContext: function () {
+            const oModel = this.getView().getModel("app");
+            const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
+            const oSelectedDocument = oModel.getProperty("/selectedDocument") || {};
+            const oLastContext = this._lastGenerationContext || {};
+
+            return {
+                templateId: oVirtualDocument.templateId || oSelectedDocument.templateId || oLastContext.templateId,
+                contractNumber: oVirtualDocument.contractNumber || oSelectedDocument.contractNumber || oLastContext.contractNumber,
+                values: oVirtualDocument.values || oSelectedDocument.values || oLastContext.values || {}
+            };
         },
 
         _syncVirtualDocumentDisplay: function () {
@@ -2750,15 +3082,42 @@ sap.ui.define([
                 return;
             }
 
-            const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
-            const aMessages = this._objectToKeyValueItems(oVirtualDocument.messages || []).map(function (oItem) {
-                return { ...oItem, value: oItem.value || oItem.name };
-            });
+            const oVirtualDocument = oModel.getProperty("/virtualDocument") || null;
+            const bHasActiveDocument = !!(oVirtualDocument && (oVirtualDocument.virtualDocumentId || oVirtualDocument.templateId || oVirtualDocument.contractNumber));
+
+            if (!bHasActiveDocument) {
+                oModel.setProperty("/virtualDisplay", {
+                    hasActiveDocument: false,
+                    emptyMessage: "No hay documento virtual seleccionado.",
+                    emptyDescription: "Selecciona un documento generado o crea un documento desde una plantilla para iniciar el ensamblaje.",
+                    header: {},
+                    messages: [],
+                    variables: [],
+                    inputFields: []
+                });
+                return;
+            }
+
+            const aDefinitions = oVirtualDocument.variableDefinitions || [];
+            const mValues = oVirtualDocument.values || {};
+            const sUpdatedAt = oVirtualDocument.lastRefreshedAt || oVirtualDocument.updatedAt || oVirtualDocument.generatedAt || "";
 
             oModel.setProperty("/virtualDisplay", {
-                messages: aMessages.length ? aMessages : [{ name: "Estado", value: "Sin mensajes del documento virtual.", type: "—", source: "—", status: "—" }],
-                variables: this._objectToKeyValueItems(oVirtualDocument.variables || []),
-                inputFields: this._objectToKeyValueItems(oVirtualDocument.inputFields || [])
+                hasActiveDocument: true,
+                header: {
+                    virtualDocumentId: oVirtualDocument.virtualDocumentId || "N/D",
+                    templateId: oVirtualDocument.templateId || "N/D",
+                    templateVersion: oVirtualDocument.templateVersion || "N/D",
+                    contractNumber: oVirtualDocument.contractNumber || "N/D",
+                    status: oVirtualDocument.status || "PENDING",
+                    statusState: this._statusToState(oVirtualDocument.status),
+                    updatedAt: this._formatDateTime(sUpdatedAt),
+                    dataSource: oVirtualDocument.dataSource || oVirtualDocument.source || "SAP/mock",
+                    documentPath: oVirtualDocument.relativePath || (oVirtualDocument.primaryFile && oVirtualDocument.primaryFile.relativePath) || ""
+                },
+                messages: this._normalizeVirtualDocumentMessages(oVirtualDocument.messages || []),
+                variables: this._normalizeVariablesForDisplay(oVirtualDocument.variables || {}, aDefinitions, mValues),
+                inputFields: this._normalizeInputFieldsForDisplay(oVirtualDocument.inputFields || {}, aDefinitions, mValues)
             });
         },
 
