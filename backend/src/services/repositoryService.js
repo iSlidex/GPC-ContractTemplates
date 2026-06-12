@@ -631,8 +631,14 @@ function buildFileDescriptor(file, metadataByContract) {
     modifiedAt: file.modifiedAt,
     size: file.size,
     variables: metadata.variables || [],
+    values: metadata.values || {},
     inputFields: virtualDocument.inputFields || [],
     messages: virtualDocument.messages || [],
+    virtualDocument: {
+      ...virtualDocument,
+      values: metadata.values || {},
+      dataSource: virtualDocument.dataSource || metadata.dataSource || metadata.source || "SAP/mock"
+    },
     isMetadata,
     availableActions: isMetadata ? ["DOWNLOAD", "DETAIL"] : getDocumentActions(fileType)
   };

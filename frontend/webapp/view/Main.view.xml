@@ -203,6 +203,7 @@
                                                     <Button text="Descargar" icon="sap-icon://download" type="Transparent" press=".onDocumentDownload" />
                                                     <Button text="Editar" icon="sap-icon://edit" type="Transparent" press=".onDocumentEdit" />
                                                     <Button text="Detalle" icon="sap-icon://detail-view" type="Transparent" press=".onDocumentAction" />
+                                                    <Button text="Ensamblaje" icon="sap-icon://synchronize" type="Transparent" press=".onDocumentAssembly" />
                                                     <Button text="Versiones" icon="sap-icon://history" type="Transparent" press=".onDocumentVersions" />
                                                 </HBox>
                                             </cells>
@@ -355,28 +356,116 @@
 
                         <IconTabFilter id="virtualDocumentTab" key="virtual" text="Ensamblaje" icon="sap-icon://synchronize">
                             <VBox id="virtualDocumentContent" class="gpcTabContent">
-                                <Panel id="virtualDocumentPanel" headerText="Último ensamblaje" class="gpcEcmCard" expandable="false">
-                                    <content>
-                                        <HBox wrap="Wrap" class="gpcMetadataGrid">
-                                            <VBox class="gpcMetadataItem"><Label text="virtualDocumentId" /><Text text="{app>/virtualDocument/virtualDocumentId}" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="templateId" /><Text text="{app>/virtualDocument/templateId}" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="templateVersion" /><Text text="{app>/virtualDocument/templateVersion}" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="contractNumber" /><Text text="{app>/virtualDocument/contractNumber}" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="status" /><ObjectStatus text="{app>/virtualDocument/status}" state="Information" /></VBox>
-                                        </HBox>
-                                        <Text text="El refresh recalcula metadata y valores SAP/mock del documento virtual, pero no regenera DOCX/PDF todavía." class="sapUiSmallMarginTop" />
-                                        <Button text="Refrescar variables SAP/mock" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiSmallMarginTop" />
-                                        <Panel headerText="Mensajes" class="sapUiSmallMarginTop" expandable="true" expanded="true">
-                                            <content><Table items="{app>/virtualDisplay/messages}"><columns><Column><Text text="Mensaje" /></Column><Column><Text text="Valor" /></Column></columns><items><ColumnListItem><cells><Text text="{app>name}" /><Text text="{app>value}" /></cells></ColumnListItem></items></Table></content>
-                                        </Panel>
-                                        <Panel headerText="Variables SAP" class="sapUiSmallMarginTop" expandable="true">
-                                            <content><Table items="{app>/virtualDisplay/variables}"><columns><Column><Text text="Nombre" /></Column><Column><Text text="Tipo" /></Column><Column><Text text="Fuente" /></Column><Column><Text text="Valor" /></Column><Column><Text text="Estado" /></Column></columns><items><ColumnListItem><cells><Text text="{app>name}" /><Text text="{app>type}" /><Text text="{app>source}" /><Text text="{app>value}" /><Text text="{app>status}" /></cells></ColumnListItem></items></Table></content>
-                                        </Panel>
-                                        <Panel headerText="Input fields" class="sapUiSmallMarginTop" expandable="true">
-                                            <content><Table items="{app>/virtualDisplay/inputFields}"><columns><Column><Text text="Nombre" /></Column><Column><Text text="Tipo" /></Column><Column><Text text="Fuente" /></Column><Column><Text text="Valor" /></Column><Column><Text text="Estado" /></Column></columns><items><ColumnListItem><cells><Text text="{app>name}" /><Text text="{app>type}" /><Text text="{app>source}" /><Text text="{app>value}" /><Text text="{app>status}" /></cells></ColumnListItem></items></Table></content>
-                                        </Panel>
-                                    </content>
-                                </Panel>
+                                <Toolbar class="gpcCardToolbar">
+                                    <VBox>
+                                        <Title text="Ensamblaje del documento" level="H3" />
+                                        <Text text="Estado del documento virtual, variables SAP, campos de usuario y mensajes de validación." />
+                                    </VBox>
+                                </Toolbar>
+
+                                <VBox visible="{= !${app>/virtualDisplay/hasActiveDocument} }" class="gpcEcmCard gpcAssemblyEmptyState sapUiSmallMarginTop">
+                                    <Title text="No hay documento virtual seleccionado." level="H2" />
+                                    <Text text="Selecciona un documento generado o crea un documento desde una plantilla para iniciar el ensamblaje." class="gpcCardLead sapUiSmallMarginTop" />
+                                    <HBox renderType="Bare" wrap="Wrap" class="sapUiMediumMarginTop">
+                                        <Button text="Ir a Documentos" icon="sap-icon://documents" press=".onGoToDocuments" class="sapUiTinyMarginEnd" />
+                                        <Button text="Crear documento" icon="sap-icon://add-document" type="Emphasized" press=".onCreateFromTemplate" />
+                                    </HBox>
+                                </VBox>
+
+                                <VBox visible="{app>/virtualDisplay/hasActiveDocument}">
+                                    <Panel id="virtualDocumentPanel" headerText="Documento seleccionado" class="gpcEcmCard" expandable="false">
+                                        <content>
+                                            <HBox wrap="Wrap" class="gpcMetadataGrid">
+                                                <VBox class="gpcMetadataItem"><Label text="virtualDocumentId" /><Text text="{app>/virtualDisplay/header/virtualDocumentId}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="templateId" /><Text text="{app>/virtualDisplay/header/templateId}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="templateVersion" /><Text text="{app>/virtualDisplay/header/templateVersion}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="contractNumber" /><Text text="{app>/virtualDisplay/header/contractNumber}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="status" /><ObjectStatus text="{app>/virtualDisplay/header/status}" state="{app>/virtualDisplay/header/statusState}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Última actualización" /><Text text="{app>/virtualDisplay/header/updatedAt}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Fuente de datos SAP/mock" /><Text text="{app>/virtualDisplay/header/dataSource}" /></VBox>
+                                            </HBox>
+                                            <Text text="El refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX/PDF." class="gpcDiscreteNote sapUiSmallMarginTop" />
+                                            <HBox renderType="Bare" wrap="Wrap" class="sapUiSmallMarginTop">
+                                                <Button text="Refrescar variables SAP/mock" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiTinyMarginEnd" />
+                                                <Button text="Ver documento" icon="sap-icon://show" press=".onSelectedAssemblyDocumentPreview" class="sapUiTinyMarginEnd" />
+                                                <Button text="Ir al detalle" icon="sap-icon://detail-view" press=".onSelectedAssemblyDocumentDetail" />
+                                            </HBox>
+                                        </content>
+                                    </Panel>
+
+                                    <Panel headerText="Mensajes" class="sapUiSmallMarginTop gpcEcmCard" expandable="true" expanded="true">
+                                        <content>
+                                            <Table items="{app>/virtualDisplay/messages}" noDataText="Sin mensajes de validación.">
+                                                <columns>
+                                                    <Column width="9rem"><Text text="Severidad" /></Column>
+                                                    <Column><Text text="Mensaje" /></Column>
+                                                    <Column width="14rem"><Text text="Campo relacionado" /></Column>
+                                                    <Column><Text text="Acción sugerida" /></Column>
+                                                </columns>
+                                                <items>
+                                                    <ColumnListItem>
+                                                        <cells>
+                                                            <ObjectStatus text="{app>severity}" state="{app>severityState}" />
+                                                            <Text text="{app>message}" wrapping="true" />
+                                                            <Text text="{app>field}" wrapping="true" />
+                                                            <Text text="{app>action}" wrapping="true" />
+                                                        </cells>
+                                                    </ColumnListItem>
+                                                </items>
+                                            </Table>
+                                        </content>
+                                    </Panel>
+
+                                    <Panel headerText="Variables SAP" class="sapUiSmallMarginTop gpcEcmCard" expandable="true" expanded="true">
+                                        <content>
+                                            <Table items="{app>/virtualDisplay/variables}" noDataText="No hay variables SAP para este documento virtual.">
+                                                <columns>
+                                                    <Column><Text text="Variable" /></Column>
+                                                    <Column width="10rem"><Text text="Tipo" /></Column>
+                                                    <Column width="10rem"><Text text="Fuente" /></Column>
+                                                    <Column><Text text="Valor" /></Column>
+                                                    <Column width="8rem"><Text text="Estado" /></Column>
+                                                </columns>
+                                                <items>
+                                                    <ColumnListItem>
+                                                        <cells>
+                                                            <Text text="{app>variable}" wrapping="true" />
+                                                            <Text text="{app>type}" />
+                                                            <Text text="{app>source}" />
+                                                            <Text text="{app>value}" tooltip="{app>jsonValue}" wrapping="true" />
+                                                            <ObjectStatus text="{app>status}" state="{= ${app>status} === 'OK' ? 'Success' : 'Warning' }" />
+                                                        </cells>
+                                                    </ColumnListItem>
+                                                </items>
+                                            </Table>
+                                        </content>
+                                    </Panel>
+
+                                    <Panel headerText="Input fields" class="sapUiSmallMarginTop gpcEcmCard" expandable="true" expanded="true">
+                                        <content>
+                                            <Table items="{app>/virtualDisplay/inputFields}" noDataText="No hay input fields para este documento virtual.">
+                                                <columns>
+                                                    <Column><Text text="Campo" /></Column>
+                                                    <Column width="10rem"><Text text="Tipo" /></Column>
+                                                    <Column width="8rem"><Text text="Requerido" /></Column>
+                                                    <Column><Text text="Valor" /></Column>
+                                                    <Column width="10rem"><Text text="Estado" /></Column>
+                                                </columns>
+                                                <items>
+                                                    <ColumnListItem>
+                                                        <cells>
+                                                            <Text text="{app>field}" wrapping="true" />
+                                                            <Text text="{app>type}" />
+                                                            <Text text="{app>requiredText}" />
+                                                            <Text text="{app>value}" tooltip="{app>jsonValue}" wrapping="true" />
+                                                            <ObjectStatus text="{app>status}" state="{= ${app>status} === 'Completado' ? 'Success' : 'Warning' }" />
+                                                        </cells>
+                                                    </ColumnListItem>
+                                                </items>
+                                            </Table>
+                                        </content>
+                                    </Panel>
+                                </VBox>
                             </VBox>
                         </IconTabFilter>
 
