@@ -18,6 +18,7 @@ const {
 
 const {
   getRepositoryTree,
+  getBusinessDocuments,
   getTemplates,
   extractTemplateVariables,
   generateContractDocuments,
@@ -145,6 +146,15 @@ function stripInternalClauseFields(clause) {
 router.get("/repository", (req, res, next) => {
   try {
     res.json(getRepositoryTree());
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+router.get("/documents", (req, res, next) => {
+  try {
+    res.json(getBusinessDocuments(req.query));
   } catch (error) {
     next(error);
   }

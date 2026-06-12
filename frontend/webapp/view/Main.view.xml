@@ -48,27 +48,69 @@
 
                 <IconTabBar id="mainTabs" class="gpcMainTabs" selectedKey="documents" expandable="false">
                     <items>
-                        <IconTabFilter id="generalInfoTab" key="general" text="Información general" icon="sap-icon://hint">
+                        <IconTabFilter id="generalInfoTab" key="general" text="Resumen" icon="sap-icon://hint">
                             <VBox id="generalInfoContent" class="gpcTabContent">
-                                <Panel id="generalInfoPanel" headerText="Datos de la transacción legal" class="gpcEcmCard" expandable="false">
-                                    <content>
-                                        <HBox id="generalInfoGrid" wrap="Wrap" class="gpcMetadataGrid">
-                                            <VBox class="gpcMetadataItem"><Label text="Contexto" /><Text text="{app>/appContext/context}" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="Categoría" /><Text text="{= ${app>/appContext/category} || 'Todas' }" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="Contract ID" /><Text text="{app>/appContext/legalTransactionId}" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="Estado" /><ObjectStatus text="{app>/appContext/status}" state="Information" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="Responsable" /><Text text="{app>/appContext/owner}" /></VBox>
-                                            <VBox class="gpcMetadataItem"><Label text="Perfil/Rol" /><Text text="{app>/appContext/profile}" /></VBox>
-                                        </HBox>
-                                    </content>
-                                </Panel>
+                                <Toolbar class="gpcCardToolbar">
+                                    <Title text="Resumen de transacción" level="H3" />
+                                    <ToolbarSpacer />
+                                    <ObjectStatus text="Centro de contexto documental" state="Information" />
+                                </Toolbar>
+                                <HBox wrap="Wrap" class="gpcSummaryGrid">
+                                    <Panel headerText="Transacción legal" class="gpcEcmCard gpcSummaryCard" expandable="false">
+                                        <content>
+                                            <VBox>
+                                                <ObjectIdentifier title="Gestión de contratos / Contrato de arrendamiento" text="{app>/appContext/legalTransactionName}" />
+                                                <HBox wrap="Wrap" class="gpcMetadataGrid">
+                                                    <VBox class="gpcMetadataItem"><Label text="ID transacción legal" /><Text text="{app>/appContext/legalTransactionId}" /></VBox>
+                                                    <VBox class="gpcMetadataItem"><Label text="Contract ID SAP/mock" /><Text text="{app>/appContext/legalTransactionId}" /></VBox>
+                                                    <VBox class="gpcMetadataItem"><Label text="Estado" /><ObjectStatus text="{app>/appContext/status}" state="Information" /></VBox>
+                                                    <VBox class="gpcMetadataItem"><Label text="Responsable" /><Text text="{app>/appContext/owner}" /></VBox>
+                                                    <VBox class="gpcMetadataItem"><Label text="Perfil simulado" /><ObjectStatus text="{app>/appContext/profile}" state="Warning" /></VBox>
+                                                    <VBox class="gpcMetadataItem"><Label text="Roles simulados" /><Text text="{app>/appContext/roles}" /></VBox>
+                                                </HBox>
+                                            </VBox>
+                                        </content>
+                                    </Panel>
+                                    <Panel headerText="Contexto documental" class="gpcEcmCard gpcSummaryCard" expandable="false">
+                                        <content>
+                                            <HBox wrap="Wrap" class="gpcMetadataGrid">
+                                                <VBox class="gpcMetadataItem"><Label text="Contexto" /><Text text="{app>/appContext/context}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Categoría" /><Text text="{= ${app>/appContext/category} || 'Todas' }" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Governing Law" /><Text text="República Dominicana" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Idioma" /><Text text="es" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Content Type preferido" /><Text text="Contrato" /></VBox>
+                                            </HBox>
+                                            <Text text="Estos valores filtran las plantillas y text blocks recomendados para crear documentos." class="sapUiSmallMarginTop" />
+                                        </content>
+                                    </Panel>
+                                    <Panel headerText="Estado del ensamblaje" class="gpcEcmCard gpcSummaryCard" expandable="false">
+                                        <content>
+                                            <HBox wrap="Wrap" class="gpcMetadataGrid">
+                                                <VBox class="gpcMetadataItem"><Label text="Último documento virtual" /><Text text="{= ${app>/virtualDocument/virtualDocumentId} || 'Sin documento virtual' }" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Status" /><ObjectStatus text="{app>/virtualDocument/status}" state="Information" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Documentos generados" /><Text text="{app>/summary/generatedDocuments}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Plantillas recomendadas" /><Text text="{app>/summary/recommendedTemplates}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Cláusulas disponibles" /><Text text="{app>/summary/availableClauses}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Última fuente de datos" /><Text text="{app>/summary/lastDataSource}" /></VBox>
+                                            </HBox>
+                                        </content>
+                                    </Panel>
+                                    <Panel headerText="Notas funcionales" class="gpcEcmCard gpcSummaryCard" expandable="false">
+                                        <content>
+                                            <Text text="Roles y perfiles son simulados por ahora. Contexto y categoría pueden venir desde un paso anterior de la app de gestión de contratos. Esta vista prioriza el flujo documental, no autenticación real." />
+                                        </content>
+                                    </Panel>
+                                </HBox>
                             </VBox>
                         </IconTabFilter>
 
                         <IconTabFilter id="documentsTab" key="documents" text="Documentos" icon="sap-icon://documents">
                             <VBox id="documentsContent" class="gpcTabContent">
                                 <Toolbar id="documentsToolbar" class="gpcCardToolbar">
-                                    <Title id="documentsTitle" text="Documentos de la transacción" level="H3" />
+                                    <VBox>
+                                        <Title id="documentsTitle" text="Documentos de la transacción" level="H3" />
+                                        <Text text="Documentos generados o asociados al contrato actual" />
+                                    </VBox>
                                     <ToolbarSpacer />
                                     <MenuButton id="documentsCreateButton" text="Crear documento" icon="sap-icon://add-document" type="Emphasized">
                                         <menu>
@@ -80,31 +122,51 @@
                                     </MenuButton>
                                 </Toolbar>
 
-                                <Table id="documentsTable" items="{app>/documents}" inset="false" class="gpcEcmCard">
+                                <Panel id="documentFiltersPanel" headerText="Filtros de documentos de negocio" class="gpcEcmCard" expandable="false">
+                                    <content>
+                                        <HBox wrap="Wrap" class="gpcFilterBar">
+                                            <Input width="14rem" placeholder="Buscar texto" value="{app>/filters/documentText}" liveChange=".onDocumentFilterChange" />
+                                            <Select width="8rem" selectedKey="{app>/filters/documentFileType}" change=".onDocumentFilterChange"><core:Item key="" text="Todos" /><core:Item key="DOCX" text="DOCX" /><core:Item key="PDF" text="PDF" /><core:Item key="HTML" text="HTML" /></Select>
+                                            <Select width="10rem" selectedKey="{app>/filters/documentStatus}" change=".onDocumentFilterChange"><core:Item key="" text="Estado: todos" /><core:Item key="GENERATED" text="GENERATED" /><core:Item key="DRAFT" text="DRAFT" /><core:Item key="FINAL" text="FINAL" /><core:Item key="SIGNED" text="SIGNED" /><core:Item key="ARCHIVED" text="ARCHIVED" /></Select>
+                                            <Select width="12rem" selectedKey="{app>/filters/documentAssemblyStatus}" change=".onDocumentFilterChange"><core:Item key="" text="Ensamblaje: todos" /><core:Item key="PENDING" text="PENDING" /><core:Item key="ERROR" text="ERROR" /><core:Item key="COMPLETED" text="COMPLETED" /><core:Item key="FINAL" text="FINAL" /></Select>
+                                            <Input width="12rem" placeholder="Categoría" value="{app>/filters/documentCategory}" liveChange=".onDocumentFilterChange" />
+                                            <Input width="14rem" placeholder="Plantilla" value="{app>/filters/documentTemplateId}" liveChange=".onDocumentFilterChange" />
+                                            <Input width="12rem" placeholder="Contract ID" value="{app>/filters/documentContractId}" liveChange=".onDocumentFilterChange" />
+                                            <Select width="9rem" selectedKey="{app>/filters/documentRange}" change=".onDocumentFilterChange"><core:Item key="recent" text="Recientes" /><core:Item key="all" text="Todos" /></Select>
+                                            <Select width="12rem" selectedKey="{app>/filters/documentSortBy}" change=".onDocumentFilterChange"><core:Item key="modifiedAt" text="Más reciente" /><core:Item key="name" text="Nombre" /><core:Item key="status" text="Estado" /><core:Item key="fileType" text="Tipo" /><core:Item key="templateId" text="Plantilla" /></Select>
+                                            <Select width="8rem" selectedKey="{app>/filters/documentSortDirection}" change=".onDocumentFilterChange"><core:Item key="desc" text="Desc" /><core:Item key="asc" text="Asc" /></Select>
+                                            <Button text="Limpiar" icon="sap-icon://clear-filter" press=".onClearDocumentFilters" />
+                                        </HBox>
+                                        <ObjectStatus text="{app>/documentSummary/notice}" state="Information" class="sapUiSmallMarginTop" />
+                                    </content>
+                                </Panel>
+
+                                <Table id="documentsTable" items="{app>/documents}" inset="false" class="gpcEcmCard sapUiSmallMarginTop">
                                     <columns>
                                         <Column width="20rem"><Text text="Documento" /></Column>
-                                        <Column width="10rem"><Text text="Clase" /></Column>
-                                        <Column width="8rem"><Text text="Archivo" /></Column>
-                                        <Column width="10rem"><Text text="Contenido" /></Column>
-                                        <Column width="6rem"><Text text="Idioma" /></Column>
+                                        <Column width="10rem"><Text text="Contrato" /></Column>
+                                        <Column width="15rem"><Text text="Plantilla / versión" /></Column>
+                                        <Column width="7rem"><Text text="Tipo" /></Column>
                                         <Column width="10rem"><Text text="Estado" /></Column>
-                                        <Column width="12rem"><Text text="Ensamblaje" /></Column>
-                                        <Column width="18rem"><Text text="Acciones" /></Column>
+                                        <Column width="11rem"><Text text="Ensamblaje" /></Column>
+                                        <Column width="12rem"><Text text="Última modificación" /></Column>
+                                        <Column width="20rem"><Text text="Acciones" /></Column>
                                     </columns>
                                     <items>
                                         <ColumnListItem type="Active" press=".onDocumentAction">
                                             <cells>
                                                 <ObjectIdentifier title="{app>name}" text="{app>relativePath}" />
-                                                <Text text="{app>documentClass}" />
+                                                <Text text="{app>contractNumber}" />
+                                                <ObjectIdentifier title="{app>templateId}" text="{app>templateVersion}" />
                                                 <ObjectStatus text="{app>fileType}" state="Information" />
-                                                <Text text="{app>contentType}" />
-                                                <Text text="{app>language}" />
                                                 <ObjectStatus text="{app>status}" state="{app>statusState}" class="gpcStatusBadge" />
                                                 <ObjectStatus text="{app>assemblyStatus}" state="{app>assemblyState}" class="gpcStatusBadge" />
+                                                <Text text="{app>modifiedAtText}" />
                                                 <HBox renderType="Bare" wrap="Wrap">
                                                     <Button text="Preview" icon="sap-icon://show" type="Transparent" press=".onDocumentPreview" />
                                                     <Button text="Descargar" icon="sap-icon://download" type="Transparent" press=".onDocumentDownload" />
                                                     <Button text="Editar" icon="sap-icon://edit" type="Transparent" press=".onDocumentEdit" />
+                                                    <Button text="Detalle" icon="sap-icon://detail-view" type="Transparent" press=".onDocumentAction" />
                                                 </HBox>
                                             </cells>
                                         </ColumnListItem>
@@ -153,6 +215,7 @@
                                     </content>
                                 </Panel>
 
+                                <ObjectStatus text="Total: {app>/templateSummary/total} · Recomendadas: {app>/templateSummary/recommended} · Ocultas por rol/perfil: {app>/templateSummary/hiddenByRole}" state="Information" class="sapUiSmallMarginTop" />
                                 <Table id="templatesTable" items="{app>/filteredTemplates}" inset="false" class="gpcEcmCard sapUiSmallMarginTop">
                                     <columns>
                                         <Column width="20rem"><Text text="Plantilla" /></Column>
@@ -191,8 +254,9 @@
                             </VBox>
                         </IconTabFilter>
 
-                        <IconTabFilter id="clausesTab" key="clauses" text="Cláusulas" icon="sap-icon://form">
+                        <IconTabFilter id="clausesTab" key="clauses" text="Text blocks / Cláusulas" icon="sap-icon://form">
                             <VBox id="clausesContent" class="gpcTabContent">
+                                <Toolbar class="gpcCardToolbar"><VBox><Title text="Text blocks / Cláusulas" level="H3" /><Text text="Biblioteca reutilizable de cláusulas y bloques de firma" /></VBox></Toolbar>
                                 <Panel id="clauseFiltersPanel" headerText="Filtros de cláusulas / text blocks" class="gpcEcmCard" expandable="false">
                                     <content>
                                         <HBox wrap="Wrap" class="gpcFilterBar">
@@ -251,13 +315,13 @@
                                         <Text text="El refresh recalcula metadata y valores SAP/mock del documento virtual, pero no regenera DOCX/PDF todavía." class="sapUiSmallMarginTop" />
                                         <Button text="Refrescar variables SAP/mock" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiSmallMarginTop" />
                                         <Panel headerText="Mensajes" class="sapUiSmallMarginTop" expandable="true" expanded="true">
-                                            <content><Text text="{app>/virtualDocument/messages}" /></content>
+                                            <content><Table items="{app>/virtualDisplay/messages}"><columns><Column><Text text="Mensaje" /></Column><Column><Text text="Valor" /></Column></columns><items><ColumnListItem><cells><Text text="{app>name}" /><Text text="{app>value}" /></cells></ColumnListItem></items></Table></content>
                                         </Panel>
                                         <Panel headerText="Variables SAP" class="sapUiSmallMarginTop" expandable="true">
-                                            <content><Text text="{app>/virtualDocument/variables}" /></content>
+                                            <content><Table items="{app>/virtualDisplay/variables}"><columns><Column><Text text="Nombre" /></Column><Column><Text text="Tipo" /></Column><Column><Text text="Fuente" /></Column><Column><Text text="Valor" /></Column><Column><Text text="Estado" /></Column></columns><items><ColumnListItem><cells><Text text="{app>name}" /><Text text="{app>type}" /><Text text="{app>source}" /><Text text="{app>value}" /><Text text="{app>status}" /></cells></ColumnListItem></items></Table></content>
                                         </Panel>
                                         <Panel headerText="Input fields" class="sapUiSmallMarginTop" expandable="true">
-                                            <content><Text text="{app>/virtualDocument/inputFields}" /></content>
+                                            <content><Table items="{app>/virtualDisplay/inputFields}"><columns><Column><Text text="Nombre" /></Column><Column><Text text="Tipo" /></Column><Column><Text text="Fuente" /></Column><Column><Text text="Valor" /></Column><Column><Text text="Estado" /></Column></columns><items><ColumnListItem><cells><Text text="{app>name}" /><Text text="{app>type}" /><Text text="{app>source}" /><Text text="{app>value}" /><Text text="{app>status}" /></cells></ColumnListItem></items></Table></content>
                                         </Panel>
                                     </content>
                                 </Panel>
@@ -266,7 +330,8 @@
 
                         <IconTabFilter id="repositoryTab" key="repository" text="Repositorio" icon="sap-icon://folder">
                             <VBox id="repositoryContent" class="gpcTabContent">
-                                <Panel id="repositoryPanel" headerText="Repositorio de archivos y versiones" expandable="false" class="gpcEcmCard">
+                                <Toolbar class="gpcCardToolbar"><VBox><Title text="Repositorio técnico de archivos y versiones" level="H3" /><Text text="Vista completa de carpetas internas, documentos generados y evidencias" /></VBox></Toolbar>
+                                <Panel id="repositoryPanel" headerText="Vista técnica" expandable="false" class="gpcEcmCard">
                                     <content>
                                         <Tree id="repositoryTree" items="{path: 'app>/repositoryTree'}">
                                             <StandardTreeItem id="repositoryTreeItem" title="{app>name}" icon="{app>icon}" type="Active" press=".onRepositoryItemPress" />

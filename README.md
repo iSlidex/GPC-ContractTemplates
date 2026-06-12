@@ -351,3 +351,24 @@ La generacion guarda metadata de documento virtual:
 - Sanitizar logs de payloads y errores antes de usar datos reales.
 - No subir documentos sensibles, PDFs generados, evidencia de firma ni outputs locales.
 - Usar placeholders seguros en ejemplos.
+
+## API de documentos de negocio
+
+La vista **Documentos** consume preferentemente `GET /api/documents` para evitar mostrar el repositorio técnico como un dump de archivos. El endpoint deriva documentos de negocio desde `backend/repository/generated`, excluye metadata técnica, agrupa versiones relacionadas por base name y devuelve acciones disponibles para preview, descarga, edición y detalle.
+
+Parámetros soportados:
+
+- `contractId`
+- `category`
+- `templateId`
+- `status`
+- `assemblyStatus`
+- `fileType`
+- `q`
+- `limit`
+- `offset`
+- `sortBy`
+- `sortDirection`
+- `range`
+
+Si `contractId` no encuentra coincidencia exacta, el endpoint conserva el indicador `hasExactContractMatch=false` para que la UI muestre un aviso y use documentos recientes filtrables como fallback.
