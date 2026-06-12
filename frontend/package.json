@@ -1,7 +1,7 @@
 {
   "name": "gpcgestindecontratos",
   "version": "0.0.1",
-  "description": "Aplicación frontend para presentar la PoC de gestión documental de contratos: plantillas, documentos generados, PDFs para firma, PDFs firmados y expedientes.",
+  "description": "Aplicación frontend para presentar el MVP interno de gestión documental de contratos: plantillas, documentos generados, PDFs para firma, PDFs firmados y expedientes.",
   "keywords": [
     "ui5",
     "openui5",

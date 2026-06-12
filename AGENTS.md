@@ -2,7 +2,7 @@
 
 ## Project context
 
-This repository is a proof of concept for Grupo Punta Cana contract management and contract assembly. It demonstrates template selection, SAP/mock data lookup, dynamic variable completion, DOCX/PDF generation, local repository browsing, document preview/editing, clause insertion, and version saving.
+This repository is an internal MVP / functional prototype for Grupo Punta Cana contract management and contract assembly. It demonstrates template selection, SAP/mock data lookup, dynamic variable completion, DOCX/PDF generation, local repository browsing, document preview/editing, clause insertion, and version saving.
 
 Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly clone yet; document gaps honestly and avoid large rewrites unless explicitly requested.
 
@@ -14,6 +14,11 @@ Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly cl
 - SAP integration: backend calls SAP OData through a BAS/UI5 local proxy, Destination/Cloud Connector, or direct base URL. It must keep mock fallback behavior.
 
 ## Current known flows
+
+- Main UI is organized into SAP ECM/ECA-inspired tabs: General Information, Documents, Templates, Clauses, Virtual Document, and Repository.
+- The frontend owns a local `appContext` model for legal transaction id/name, context, category, simulated profile/roles, and role-filter flags. Query params `contractId`, `context`, `category`, and `profile` can override defaults.
+- Roles are simulated only (`LEGAL_ADMIN`, `LEGAL_USER`, `BUSINESS_USER`, `VIEWER`); do not implement real authentication unless explicitly requested.
+- Template and clause list endpoints accept optional query filters while preserving no-query compatibility.
 
 - Load templates with `GET /api/templates`.
 - Extract variables with `GET /api/templates/:templateId/variables`.

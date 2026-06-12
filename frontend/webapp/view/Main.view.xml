@@ -1,207 +1,282 @@
 <mvc:View
     controllerName="com.gpc.contracts.GPCGestindeContratos.controller.Main"
     xmlns:mvc="sap.ui.core.mvc"
+    xmlns:core="sap.ui.core"
     xmlns="sap.m">
 
     <Page
         id="contractsPage"
-        title="GPC - Gestión de Contratos"
-        class="sapUiResponsiveContentPadding">
-
+        showHeader="false"
+        class="gpcEcmPage">
         <content>
-            <VBox id="mainContainer" class="sapUiMediumMargin" width="100%">
+            <VBox id="mainContainer" width="100%" class="gpcEcmShell">
 
-                <Title
-                    id="mainTitle"
-                    text="PoC Funcional de Gestión Documental de Contratos"
-                    level="H2"
-                    class="sapUiSmallMarginBottom" />
-
-                <Text
-                    id="mainDescription"
-                    text="La aplicación lee plantillas DOCX, detecta sus variables, genera formularios dinámicos y permite producir documentos DOCX/PDF para firma."
-                    class="sapUiSmallMarginBottom" />
-
-                <Toolbar id="mainToolbar" class="sapUiSmallMarginBottom">
-                    <ObjectStatus
-                        id="backendStatus"
-                        text="{app>/backendStatus}"
-                        state="{app>/backendStatusState}" />
-                    <ToolbarSpacer id="toolbarSpacer" />
-                    <Button
-                        id="reloadButton"
-                        text="Recargar repositorio"
-                        icon="sap-icon://refresh"
-                        press=".onReload" />
-                    <Button
-                        id="manageClausesButton"
-                        text="Gestionar cláusulas"
-                        icon="sap-icon://form"
-                        press=".onManageClauses" />
+                <Toolbar id="gpcShellBar" class="gpcShellBar">
+                    <Title id="shellTitle" text="GPC Contract Management" level="H4" class="gpcShellTitle" />
+                    <ToolbarSpacer id="shellSpacer" />
+                    <ObjectStatus id="backendStatus" text="{app>/backendStatus}" state="{app>/backendStatusState}" class="gpcShellStatus" />
+                    <Button id="shellReloadButton" text="Recargar" icon="sap-icon://refresh" type="Transparent" press=".onReload" class="gpcShellButton" />
                 </Toolbar>
 
-                <Panel
-                    id="processPanel"
-                    headerText="Flujo funcional"
-                    expandable="false"
-                    class="sapUiSmallMarginBottom">
-                    <content>
-                        <HBox
-                            id="processFlowBox"
-                            alignItems="Center"
-                            justifyContent="SpaceAround"
-                            width="100%">
-                            <ObjectStatus id="stepTemplate" text="1. Seleccionar plantilla" state="Success" icon="sap-icon://document-text" />
-                            <Text id="arrow1" text="→" />
-                            <ObjectStatus id="stepVariables" text="2. Leer variables" state="Information" icon="sap-icon://syntax" />
-                            <Text id="arrow2" text="→" />
-                            <ObjectStatus id="stepForm" text="3. Formulario dinámico" state="Information" icon="sap-icon://form" />
-                            <Text id="arrow3" text="→" />
-                            <ObjectStatus id="stepGenerate" text="4. Generar DOCX/PDF" state="Warning" icon="sap-icon://documents" />
-                            <Text id="arrow4" text="→" />
-                            <ObjectStatus id="stepSignature" text="5. Listo para firma" state="Success" icon="sap-icon://signature" />
-                        </HBox>
-                    </content>
-                </Panel>
-
-                <Panel
-                    id="templatesPanel"
-                    headerText="Plantillas disponibles"
-                    expandable="false"
-                    class="sapUiSmallMarginBottom">
-                    <content>
-                        <Table
-                            id="templatesTable"
-                            items="{app>/templates}"
-                            inset="false">
-
-                            <columns>
-                                <Column id="templateNameColumn" width="22rem">
-                                    <Text id="templateNameColumnText" text="Plantilla" />
-                                </Column>
-                                <Column id="templateMetaColumn" width="16rem">
-                                    <Text id="templateMetaColumnText" text="Metadata" />
-                                </Column>
-                                <Column id="templateVersionColumn" width="8rem">
-                                    <Text id="templateVersionColumnText" text="Versión" />
-                                </Column>
-                                <Column id="templateStatusColumn" width="10rem">
-                                    <Text id="templateStatusColumnText" text="Estado" />
-                                </Column>
-                                <Column id="templateActionsColumn" width="16rem">
-                                    <Text id="templateActionsColumnText" text="Acciones" />
-                                </Column>
-                            </columns>
-
-                            <items>
-                                <ColumnListItem id="templateRow">
-                                    <cells>
-                                        <ObjectIdentifier
-                                            id="templateIdentifier"
-                                            title="{app>name}"
-                                            text="{app>relativePath}" />
-
-                                        <VBox id="templateMetaBox">
-                                            <Text id="templateContentTypeText" text="{app>contentType}" />
-                                            <Text id="templateLawText" text="Ley: {app>governingLaw}" />
-                                            <Text id="templateLanguageText" text="Idioma: {app>language}" />
-                                        </VBox>
-
-                                        <ObjectIdentifier
-                                            id="templateVersionText"
-                                            title="{app>version}"
-                                            text="Rev. {app>revision}" />
-
-                                        <ObjectStatus
-                                            id="templateStatus"
-                                            text="{app>status}"
-                                            state="{app>statusState}" />
-
-                                        <HBox id="templateActionsBox" renderType="Bare" wrap="Wrap">
-                                            <Button
-                                                id="viewVariablesButton"
-                                                text="Variables"
-                                                icon="sap-icon://syntax"
-                                                type="Transparent"
-                                                press=".onShowVariables" />
-
-                                            <Button
-                                                id="templateLifecycleButton"
-                                                text="Propiedades"
-                                                icon="sap-icon://process"
-                                                type="Transparent"
-                                                press=".onOpenTemplateProperties" />
-
-                                            <Button
-                                                id="useTemplateButton"
-                                                text="Usar plantilla"
-                                                icon="sap-icon://form"
-                                                type="Emphasized"
-                                                press=".onUseTemplate" />
-                                        </HBox>
-                                    </cells>
-                                </ColumnListItem>
-                            </items>
-                        </Table>
-                    </content>
-                </Panel>
-
-                <Panel
-                    id="repositoryPanel"
-                    headerText="Repositorio de archivos y versiones"
-                    expandable="false"
-                    class="sapUiSmallMarginBottom">
-                    <content>
-                        <Tree
-                            id="repositoryTree"
-                            items="{path: 'app>/repositoryTree'}">
-                            <StandardTreeItem
-                                id="repositoryTreeItem"
-                                title="{app>name}"
-                                icon="{app>icon}"
-                                type="Active"
-                                press=".onRepositoryItemPress" />
-                        </Tree>
-                    </content>
-                </Panel>
-
-                <Panel
-                    id="generationPanel"
-                    headerText="Última generación"
-                    expandable="false">
-                    <content>
-                        <VBox id="generationResultBox" visible="{app>/hasGenerationResult}">
-                            <ObjectStatus
-                                id="generationStatus"
-                                text="{app>/generationMessage}"
-                                state="Success"
-                                class="sapUiSmallMarginBottom" />
-
-                            <Link
-                                id="downloadDocxLink"
-                                text="{app>/lastGeneration/docxText}"
-                                href="{app>/lastGeneration/docxUrl}"
-                                target="_blank" />
-
-                            <Link
-                                id="downloadPdfLink"
-                                text="{app>/lastGeneration/pdfText}"
-                                href="{app>/lastGeneration/pdfUrl}"
-                                target="_blank" />
-
-                            <Link
-                                id="downloadMetadataLink"
-                                text="{app>/lastGeneration/metadataText}"
-                                href="{app>/lastGeneration/metadataUrl}"
-                                target="_blank" />
+                <VBox id="transactionHeader" class="gpcTransactionHeader">
+                    <HBox id="transactionHeaderTop" justifyContent="SpaceBetween" alignItems="Start" wrap="Wrap">
+                        <VBox id="transactionTitleBox">
+                            <Text id="transactionEyebrow" text="Transacción legal" class="gpcEyebrow" />
+                            <Title id="mainTitle" text="Gestión de contratos" level="H1" class="gpcTransactionTitle" />
+                            <Text id="mainDescription" text="{app>/appContext/legalTransactionName} · ID {app>/appContext/legalTransactionId}" class="gpcTransactionSubtitle" />
                         </VBox>
+                        <HBox id="headerActions" wrap="Wrap" alignItems="Center">
+                            <MenuButton id="createDocumentButton" text="Crear documento" icon="sap-icon://add-document" type="Emphasized" class="gpcPrimaryButton">
+                                <menu>
+                                    <Menu id="createDocumentMenu" itemSelected=".onCreateDocumentAction">
+                                        <MenuItem id="uploadDocumentMenuItem" key="upload" text="Cargar archivo" icon="sap-icon://upload" />
+                                        <MenuItem id="createFromTemplateMenuItem" key="template" text="Crear a partir de plantilla" icon="sap-icon://document-text" />
+                                    </Menu>
+                                </menu>
+                            </MenuButton>
+                            <Button id="manageClausesButton" text="Gestionar cláusulas" icon="sap-icon://form" press=".onManageClauses" class="gpcSecondaryButton" />
+                        </HBox>
+                    </HBox>
 
-                        <Text
-                            id="noGenerationText"
-                            visible="{= !${app>/hasGenerationResult} }"
-                            text="Todavía no se ha generado ningún documento desde la aplicación." />
-                    </content>
-                </Panel>
+                    <HBox id="contextPills" wrap="Wrap" class="gpcPillRow">
+                        <ObjectStatus id="contextPill" text="Contexto: {app>/appContext/context}" state="Information" class="gpcPill" />
+                        <ObjectStatus id="categoryPill" text="Categoría: {= ${app>/appContext/category} || 'Todas' }" state="Information" class="gpcPill" />
+                        <ObjectStatus id="profilePill" text="Perfil simulado: {app>/appContext/profile}" state="Warning" class="gpcPill" />
+                        <ObjectStatus id="roleNoticePill" text="Filtros por contexto/categoría activos; roles reales pendientes" state="None" class="gpcPill" />
+                    </HBox>
+                </VBox>
+
+                <IconTabBar id="mainTabs" class="gpcMainTabs" selectedKey="documents" expandable="false">
+                    <items>
+                        <IconTabFilter id="generalInfoTab" key="general" text="Información general" icon="sap-icon://hint">
+                            <VBox id="generalInfoContent" class="gpcTabContent">
+                                <Panel id="generalInfoPanel" headerText="Datos de la transacción legal" class="gpcEcmCard" expandable="false">
+                                    <content>
+                                        <HBox id="generalInfoGrid" wrap="Wrap" class="gpcMetadataGrid">
+                                            <VBox class="gpcMetadataItem"><Label text="Contexto" /><Text text="{app>/appContext/context}" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="Categoría" /><Text text="{= ${app>/appContext/category} || 'Todas' }" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="Contract ID" /><Text text="{app>/appContext/legalTransactionId}" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="Estado" /><ObjectStatus text="{app>/appContext/status}" state="Information" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="Responsable" /><Text text="{app>/appContext/owner}" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="Perfil/Rol" /><Text text="{app>/appContext/profile}" /></VBox>
+                                        </HBox>
+                                    </content>
+                                </Panel>
+                            </VBox>
+                        </IconTabFilter>
+
+                        <IconTabFilter id="documentsTab" key="documents" text="Documentos" icon="sap-icon://documents">
+                            <VBox id="documentsContent" class="gpcTabContent">
+                                <Toolbar id="documentsToolbar" class="gpcCardToolbar">
+                                    <Title id="documentsTitle" text="Documentos de la transacción" level="H3" />
+                                    <ToolbarSpacer />
+                                    <MenuButton id="documentsCreateButton" text="Crear documento" icon="sap-icon://add-document" type="Emphasized">
+                                        <menu>
+                                            <Menu id="documentsCreateMenu" itemSelected=".onCreateDocumentAction">
+                                                <MenuItem id="documentsUploadMenuItem" key="upload" text="Cargar archivo" icon="sap-icon://upload" />
+                                                <MenuItem id="documentsTemplateMenuItem" key="template" text="Crear a partir de plantilla" icon="sap-icon://document-text" />
+                                            </Menu>
+                                        </menu>
+                                    </MenuButton>
+                                </Toolbar>
+
+                                <Table id="documentsTable" items="{app>/documents}" inset="false" class="gpcEcmCard">
+                                    <columns>
+                                        <Column width="20rem"><Text text="Documento" /></Column>
+                                        <Column width="10rem"><Text text="Clase" /></Column>
+                                        <Column width="8rem"><Text text="Archivo" /></Column>
+                                        <Column width="10rem"><Text text="Contenido" /></Column>
+                                        <Column width="6rem"><Text text="Idioma" /></Column>
+                                        <Column width="10rem"><Text text="Estado" /></Column>
+                                        <Column width="12rem"><Text text="Ensamblaje" /></Column>
+                                        <Column width="18rem"><Text text="Acciones" /></Column>
+                                    </columns>
+                                    <items>
+                                        <ColumnListItem type="Active" press=".onDocumentAction">
+                                            <cells>
+                                                <ObjectIdentifier title="{app>name}" text="{app>relativePath}" />
+                                                <Text text="{app>documentClass}" />
+                                                <ObjectStatus text="{app>fileType}" state="Information" />
+                                                <Text text="{app>contentType}" />
+                                                <Text text="{app>language}" />
+                                                <ObjectStatus text="{app>status}" state="{app>statusState}" class="gpcStatusBadge" />
+                                                <ObjectStatus text="{app>assemblyStatus}" state="{app>assemblyState}" class="gpcStatusBadge" />
+                                                <HBox renderType="Bare" wrap="Wrap">
+                                                    <Button text="Preview" icon="sap-icon://show" type="Transparent" press=".onDocumentPreview" />
+                                                    <Button text="Descargar" icon="sap-icon://download" type="Transparent" press=".onDocumentDownload" />
+                                                    <Button text="Editar" icon="sap-icon://edit" type="Transparent" press=".onDocumentEdit" />
+                                                </HBox>
+                                            </cells>
+                                        </ColumnListItem>
+                                    </items>
+                                </Table>
+
+                                <Panel id="generationPanel" headerText="Última generación" expandable="false" class="gpcEcmCard sapUiSmallMarginTop">
+                                    <content>
+                                        <VBox id="generationResultBox" visible="{app>/hasGenerationResult}">
+                                            <ObjectStatus id="generationStatus" text="{app>/generationMessage}" state="Success" class="sapUiSmallMarginBottom" />
+                                            <Link id="downloadDocxLink" text="{app>/lastGeneration/docxText}" href="{app>/lastGeneration/docxUrl}" target="_blank" />
+                                            <Link id="downloadPdfLink" text="{app>/lastGeneration/pdfText}" href="{app>/lastGeneration/pdfUrl}" target="_blank" />
+                                            <Link id="downloadMetadataLink" text="{app>/lastGeneration/metadataText}" href="{app>/lastGeneration/metadataUrl}" target="_blank" />
+                                        </VBox>
+                                        <Text id="noGenerationText" visible="{= !${app>/hasGenerationResult} }" text="Todavía no se ha generado ningún documento desde la aplicación." />
+                                    </content>
+                                </Panel>
+                            </VBox>
+                        </IconTabFilter>
+
+                        <IconTabFilter id="templatesTab" key="templates" text="Plantillas" icon="sap-icon://document-text">
+                            <VBox id="templatesContent" class="gpcTabContent">
+                                <Panel id="templateFiltersPanel" headerText="Filtros de plantillas" class="gpcEcmCard" expandable="false">
+                                    <content>
+                                        <HBox wrap="Wrap" class="gpcFilterBar">
+                                            <Input width="14rem" placeholder="Buscar texto" value="{app>/filters/templateText}" liveChange=".onTemplateFilterChange" />
+                                            <Input width="12rem" placeholder="Contexto" value="{app>/filters/templateContext}" liveChange=".onTemplateFilterChange" />
+                                            <Input width="16rem" placeholder="Categoría" value="{app>/filters/templateCategory}" liveChange=".onTemplateFilterChange" />
+                                            <Input width="10rem" placeholder="Content Type" value="{app>/filters/templateContentType}" liveChange=".onTemplateFilterChange" />
+                                            <Input width="9rem" placeholder="Governing Law" value="{app>/filters/templateGoverningLaw}" liveChange=".onTemplateFilterChange" />
+                                            <Input width="8rem" placeholder="Idioma" value="{app>/filters/templateLanguage}" liveChange=".onTemplateFilterChange" />
+                                            <Select width="12rem" selectedKey="{app>/filters/templateStatus}" change=".onTemplateFilterChange">
+                                                <core:Item key="" text="Todos los estados" />
+                                                <core:Item key="DRAFT" text="DRAFT" />
+                                                <core:Item key="APPROVED" text="APPROVED" />
+                                                <core:Item key="RELEASED" text="RELEASED" />
+                                                <core:Item key="ARCHIVED" text="ARCHIVED" />
+                                            </Select>
+                                            <Select width="12rem" selectedKey="{app>/filters/templateProfile}" change=".onTemplateFilterChange">
+                                                <core:Item key="LEGAL_ADMIN" text="LEGAL_ADMIN" />
+                                                <core:Item key="LEGAL_USER" text="LEGAL_USER" />
+                                                <core:Item key="BUSINESS_USER" text="BUSINESS_USER" />
+                                                <core:Item key="VIEWER" text="VIEWER" />
+                                            </Select>
+                                        </HBox>
+                                    </content>
+                                </Panel>
+
+                                <Table id="templatesTable" items="{app>/filteredTemplates}" inset="false" class="gpcEcmCard sapUiSmallMarginTop">
+                                    <columns>
+                                        <Column width="20rem"><Text text="Plantilla" /></Column>
+                                        <Column width="12rem"><Text text="Versión" /></Column>
+                                        <Column width="10rem"><Text text="Estado" /></Column>
+                                        <Column width="18rem"><Text text="Categorías" /></Column>
+                                        <Column width="10rem"><Text text="Content Type" /></Column>
+                                        <Column width="10rem"><Text text="Governing Law" /></Column>
+                                        <Column width="8rem"><Text text="Idioma" /></Column>
+                                        <Column width="12rem"><Text text="Owner" /></Column>
+                                        <Column width="18rem"><Text text="Acciones" /></Column>
+                                    </columns>
+                                    <items>
+                                        <ColumnListItem>
+                                            <cells>
+                                                <VBox>
+                                                    <ObjectIdentifier title="{app>name}" text="{app>description}" />
+                                                    <ObjectStatus text="{app>recommendationText}" state="{app>recommendationState}" />
+                                                </VBox>
+                                                <ObjectIdentifier title="{app>version}" text="Rev. {app>revision}" />
+                                                <ObjectStatus text="{app>status}" state="{app>statusState}" class="gpcStatusBadge" />
+                                                <Text text="{app>categories}" />
+                                                <Text text="{app>contentType}" />
+                                                <Text text="{app>governingLaw}" />
+                                                <Text text="{app>language}" />
+                                                <Text text="{app>owner}" />
+                                                <HBox renderType="Bare" wrap="Wrap">
+                                                    <Button text="Usar" icon="sap-icon://form" type="Emphasized" press=".onUseTemplate" />
+                                                    <Button text="Variables" icon="sap-icon://syntax" type="Transparent" press=".onShowVariables" />
+                                                    <Button text="Propiedades" icon="sap-icon://process" type="Transparent" press=".onOpenTemplateProperties" />
+                                                </HBox>
+                                            </cells>
+                                        </ColumnListItem>
+                                    </items>
+                                </Table>
+                            </VBox>
+                        </IconTabFilter>
+
+                        <IconTabFilter id="clausesTab" key="clauses" text="Cláusulas" icon="sap-icon://form">
+                            <VBox id="clausesContent" class="gpcTabContent">
+                                <Panel id="clauseFiltersPanel" headerText="Filtros de cláusulas / text blocks" class="gpcEcmCard" expandable="false">
+                                    <content>
+                                        <HBox wrap="Wrap" class="gpcFilterBar">
+                                            <Input width="14rem" placeholder="Buscar texto" value="{app>/filters/clauseText}" liveChange=".onClauseFilterChange" />
+                                            <Input width="14rem" placeholder="Categoría" value="{app>/filters/clauseCategory}" liveChange=".onClauseFilterChange" />
+                                            <Input width="10rem" placeholder="Estado" value="{app>/filters/clauseStatus}" liveChange=".onClauseFilterChange" />
+                                            <Input width="10rem" placeholder="Tipo" value="{app>/filters/clauseType}" liveChange=".onClauseFilterChange" />
+                                            <Input width="10rem" placeholder="Clase" value="{app>/filters/clauseClass}" liveChange=".onClauseFilterChange" />
+                                            <Input width="10rem" placeholder="Ley" value="{app>/filters/clauseGoverningLaw}" liveChange=".onClauseFilterChange" />
+                                            <Input width="8rem" placeholder="Idioma" value="{app>/filters/clauseLanguage}" liveChange=".onClauseFilterChange" />
+                                            <Button text="Abrir gestor" icon="sap-icon://form" press=".onManageClauses" />
+                                        </HBox>
+                                    </content>
+                                </Panel>
+
+                                <Table id="clausesTable" items="{app>/filteredClauses}" inset="false" class="gpcEcmCard sapUiSmallMarginTop">
+                                    <columns>
+                                        <Column width="20rem"><Text text="Text block" /></Column>
+                                        <Column width="12rem"><Text text="Categoría" /></Column>
+                                        <Column width="9rem"><Text text="Estado" /></Column>
+                                        <Column width="9rem"><Text text="Tipo" /></Column>
+                                        <Column width="9rem"><Text text="Clase" /></Column>
+                                        <Column width="10rem"><Text text="Ley" /></Column>
+                                        <Column width="8rem"><Text text="Idioma" /></Column>
+                                        <Column width="14rem"><Text text="Lifecycle" /></Column>
+                                    </columns>
+                                    <items>
+                                        <ColumnListItem>
+                                            <cells>
+                                                <ObjectIdentifier title="{app>title}" text="{app>description}" />
+                                                <Text text="{app>category}" />
+                                                <ObjectStatus text="{app>status}" state="{app>statusState}" class="gpcStatusBadge" />
+                                                <Text text="{app>type}" />
+                                                <Text text="{app>class}" />
+                                                <Text text="{app>governingLaw}" />
+                                                <Text text="{app>language}" />
+                                                <Text text="{app>availableActions}" />
+                                            </cells>
+                                        </ColumnListItem>
+                                    </items>
+                                </Table>
+                            </VBox>
+                        </IconTabFilter>
+
+                        <IconTabFilter id="virtualDocumentTab" key="virtual" text="Documento virtual" icon="sap-icon://synchronize">
+                            <VBox id="virtualDocumentContent" class="gpcTabContent">
+                                <Panel id="virtualDocumentPanel" headerText="Último documento virtual" class="gpcEcmCard" expandable="false">
+                                    <content>
+                                        <HBox wrap="Wrap" class="gpcMetadataGrid">
+                                            <VBox class="gpcMetadataItem"><Label text="virtualDocumentId" /><Text text="{app>/virtualDocument/virtualDocumentId}" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="templateId" /><Text text="{app>/virtualDocument/templateId}" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="templateVersion" /><Text text="{app>/virtualDocument/templateVersion}" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="contractNumber" /><Text text="{app>/virtualDocument/contractNumber}" /></VBox>
+                                            <VBox class="gpcMetadataItem"><Label text="status" /><ObjectStatus text="{app>/virtualDocument/status}" state="Information" /></VBox>
+                                        </HBox>
+                                        <Text text="El refresh recalcula metadata y valores SAP/mock del documento virtual, pero no regenera DOCX/PDF todavía." class="sapUiSmallMarginTop" />
+                                        <Button text="Refrescar variables SAP/mock" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiSmallMarginTop" />
+                                        <Panel headerText="Mensajes" class="sapUiSmallMarginTop" expandable="true" expanded="true">
+                                            <content><Text text="{app>/virtualDocument/messages}" /></content>
+                                        </Panel>
+                                        <Panel headerText="Variables SAP" class="sapUiSmallMarginTop" expandable="true">
+                                            <content><Text text="{app>/virtualDocument/variables}" /></content>
+                                        </Panel>
+                                        <Panel headerText="Input fields" class="sapUiSmallMarginTop" expandable="true">
+                                            <content><Text text="{app>/virtualDocument/inputFields}" /></content>
+                                        </Panel>
+                                    </content>
+                                </Panel>
+                            </VBox>
+                        </IconTabFilter>
+
+                        <IconTabFilter id="repositoryTab" key="repository" text="Repositorio" icon="sap-icon://folder">
+                            <VBox id="repositoryContent" class="gpcTabContent">
+                                <Panel id="repositoryPanel" headerText="Repositorio de archivos y versiones" expandable="false" class="gpcEcmCard">
+                                    <content>
+                                        <Tree id="repositoryTree" items="{path: 'app>/repositoryTree'}">
+                                            <StandardTreeItem id="repositoryTreeItem" title="{app>name}" icon="{app>icon}" type="Active" press=".onRepositoryItemPress" />
+                                        </Tree>
+                                    </content>
+                                </Panel>
+                            </VBox>
+                        </IconTabFilter>
+                    </items>
+                </IconTabBar>
 
             </VBox>
         </content>

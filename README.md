@@ -1,6 +1,6 @@
-# GPC Contract Management PoC
+# GPC Contract Management MVP interno
 
-PoC funcional para gestion y ensamblaje de contratos de Grupo Punta Cana. El prototipo combina un frontend SAPUI5/Fiori freestyle con un backend Node/Express para seleccionar plantillas, completar variables desde SAP o mock, generar documentos DOCX/PDF y administrar un repositorio local de plantillas, clausulas y versiones.
+MVP interno / prototipo funcional para gestion y ensamblaje de contratos de Grupo Punta Cana. El prototipo combina un frontend SAPUI5/Fiori freestyle con un backend Node/Express para seleccionar plantillas, completar variables desde SAP o mock, generar documentos DOCX/PDF y administrar un repositorio local de plantillas, clausulas y versiones.
 
 ## Alcance actual
 
@@ -12,7 +12,7 @@ PoC funcional para gestion y ensamblaje de contratos de Grupo Punta Cana. El pro
 - Biblioteca simple de clausulas HTML insertables en el editor.
 - Guardado de nuevas versiones HTML y exportacion de versiones Word.
 
-No es todavia un reemplazo productivo de SAP Enterprise Contract Assembly (ECA). Es una PoC para validar flujos, integraciones y experiencia operativa.
+No es todavia un reemplazo productivo de SAP Enterprise Contract Assembly (ECA). Es un prototipo funcional para validar flujos, integraciones y experiencia operativa de MVP interno.
 
 ## Arquitectura
 
@@ -60,6 +60,67 @@ No es todavia un reemplazo productivo de SAP Enterprise Contract Assembly (ECA).
 8. Revisar el repositorio de archivos.
 9. Previsualizar o descargar documentos.
 10. Editar la representacion HTML, insertar clausulas y guardar nuevas versiones HTML o Word.
+
+
+## UI tipo SAP ECM/ECA y flujo documental
+
+La pantalla principal se organiza en tabs SAPUI5 para acercar la experiencia al modelo SAP ECM/ECA sin copiar HTML plano del mockup de referencia:
+
+1. **Información general**: contexto de la transacción legal, categoría, Contract ID, estado, responsable y perfil simulado.
+2. **Documentos**: tab principal con tabla de documentos generados/relevantes del repositorio, acciones de preview, descarga, edición RichText y acceso a detalle.
+3. **Plantillas**: catálogo filtrable con metadata, estado, versión, owner, ley aplicable, idioma y acciones existentes de variables, propiedades/lifecycle y uso de plantilla.
+4. **Cláusulas**: biblioteca de text blocks con filtros y acceso al gestor actual de lifecycle/versiones/variantes.
+5. **Documento virtual**: estado, mensajes, variables SAP e input fields del último documento generado o refrescado. El refresh recalcula metadata/valores SAP/mock, pero todavía no regenera DOCX/PDF.
+6. **Repositorio**: árbol local actual para preview, descarga y edición.
+
+El botón **Crear documento** ofrece las acciones **Cargar archivo** (placeholder visual para iteración posterior) y **Crear a partir de plantilla**. El flujo de plantilla abre un diálogo con contexto/categoría/perfil autocompletados, buscador, plantillas recomendadas y reutiliza el formulario dinámico existente para consultar SAP/mock y generar DOCX/PDF.
+
+## Modelo de contexto, categoria y perfil simulado
+
+El frontend crea un modelo JSON local en `app>/appContext` con valores por defecto:
+
+```json
+{
+  "legalTransactionId": "1000000016",
+  "legalTransactionName": "CONTRATO DE ARRENDAMIENTO",
+  "context": "Arrendamiento",
+  "category": "",
+  "profile": "LEGAL_USER",
+  "roles": ["LEGAL_USER"],
+  "roleFiltersEnabled": true
+}
+```
+
+La app esta preparada para recibir datos de un paso anterior mediante query params:
+
+```text
+?contractId=1000000016&context=Arrendamiento&category=Arrendamiento%20de%20inmuebles&profile=LEGAL_USER
+```
+
+Roles/perfiles simulados actuales:
+
+- `LEGAL_ADMIN`: ve todas las plantillas.
+- `LEGAL_USER`: ve plantillas no archivadas.
+- `BUSINESS_USER`: ve preferiblemente plantillas `RELEASED` o `APPROVED`.
+- `VIEWER`: ve solo plantillas `RELEASED`.
+
+Pendiente para roles reales: autenticacion, autorizacion centralizada, usuarios reales, asignacion de perfiles desde IdP/SAP y auditoria de decisiones de filtrado.
+
+## Query params de filtros backend
+
+`GET /api/templates` acepta filtros opcionales sin romper llamadas existentes:
+
+```text
+/api/templates?context=Arrendamiento&category=Arrendamiento%20de%20inmuebles&profile=LEGAL_USER&status=RELEASED&language=es&governingLaw=DO&contentType=DOCX&q=arrendamiento
+```
+
+`GET /api/clauses` acepta filtros opcionales:
+
+```text
+/api/clauses?category=SERVICIOS&status=APPROVED&language=es&governingLaw=DO&type=CLAUSE&q=terminacion
+```
+
+Los filtros son tolerantes: comparan texto en metadata derivada/sidecar y mantienen compatibilidad cuando no se envian parametros.
 
 ## Endpoints principales
 
@@ -149,7 +210,7 @@ Para trabajar sin SAP, levantar el backend con `SAP_ODATA_FORCE_MOCK=true`. `ui5
 ## Estado actual de integracion SAP
 
 - Cloud Connector/Destination se considera alcanzable desde BAS cuando el proxy local UI5 esta levantado en `localhost:8080`.
-- Destination elegida para la PoC: `GPC_CLM_CONTRACT_ODATA`.
+- Destination elegida para el prototipo funcional: `GPC_CLM_CONTRACT_ODATA`.
 - El backend esta preparado para consultar SAP OData usando `SAP_ODATA_BASE_URL`.
 - Para probar SAP real localmente: levantar `frontend/ui5-local.yaml`, configurar `SAP_ODATA_BASE_URL=http://localhost:8080` en backend y consultar `GET /api/sap/contracts/900000000001`.
 - El endpoint probado por ABAP se documenta como `/sap/opu/odata/sap/ZCLM_CONTRACT_SRV_SRV/contractSet('900000000001')`.
@@ -159,7 +220,7 @@ Para trabajar sin SAP, levantar el backend con `SAP_ODATA_FORCE_MOCK=true`. `ui5
 
 ## Alineacion con SAP Enterprise Contract Assembly
 
-Cubierto en la PoC:
+Cubierto en el MVP interno / prototipo funcional:
 
 - Gestion basica de plantillas en repositorio local.
 - Metadatos ligeros de plantillas en `GET /api/templates`: `contentType`, `categories`, `governingLaw`, `language`, `description`, `validFrom`, `validTo`, `owner`, `revision`, `replacedBy` y `availableActions`.
