@@ -91,6 +91,7 @@ sap.ui.define([
                 filteredTemplates: [],
                 clauses: [],
                 filteredClauses: [],
+                clauseSummary: { total: 0, filtered: 0 },
                 repositoryTree: [],
                 documents: [],
                 documentSummary: { total: 0, filtered: 0, limit: 20, offset: 0, notice: "", isEmpty: false, canLoadMore: false },
@@ -222,7 +223,7 @@ sap.ui.define([
                 oModel.setProperty("/backendStatus", "Backend conectado");
                 oModel.setProperty("/backendStatusState", "Success");
                 oModel.setProperty("/templates", this._decorateTemplates(oTemplates.templates || []));
-                oModel.setProperty("/clauses", oClauses.clauses || []);
+                oModel.setProperty("/clauses", this._decorateClauses(oClauses.clauses || []));
                 oModel.setProperty("/repositoryTree", aPreparedTree);
                 this._setBusinessDocuments(oDocuments);
                 this._applyTemplateFilters();
@@ -467,6 +468,21 @@ sap.ui.define([
             return "Information";
         },
 
+
+        _labelForStatus: function (sStatus) {
+            const mLabels = {
+                DRAFT: "Borrador",
+                SENT_FOR_APPROVAL: "En aprobación",
+                APPROVED: "Aprobado",
+                RELEASED: "Liberado",
+                EXPIRED: "Expirado",
+                REPLACED: "Reemplazado",
+                ARCHIVED: "Archivado"
+            };
+
+            return mLabels[String(sStatus || "").toUpperCase()] || sStatus || "N/D";
+        },
+
         _updateSummaryCards: function () {
             const oModel = this.getView().getModel("app");
             const aTemplates = oModel.getProperty("/templates") || [];
@@ -606,6 +622,22 @@ sap.ui.define([
             }.bind(this));
         },
 
+        _decorateClauses: function (aClauses) {
+            return (aClauses || []).map(function (oClause) {
+                const aAvailableActions = oClause.availableActions || [];
+                const aActionLabels = aAvailableActions.map(this._labelForAction.bind(this));
+
+                return {
+                    ...oClause,
+                    statusState: this._statusToState(oClause.status),
+                    statusLabel: this._labelForStatus(oClause.status),
+                    actionLabels: aActionLabels,
+                    actionLabelsText: aActionLabels.join(", ") || "Sin acciones disponibles",
+                    actionsSummary: "Acciones disponibles: " + aAvailableActions.length
+                };
+            }.bind(this));
+        },
+
         _textMatches: function (vValue, sNeedle) {
             if (!sNeedle) {
                 return true;
@@ -726,6 +758,10 @@ sap.ui.define([
             }.bind(this));
 
             oModel.setProperty("/filteredClauses", aFiltered);
+            oModel.setProperty("/clauseSummary", {
+                total: aClauses.length,
+                filtered: aFiltered.length
+            });
             this._updateSummaryCards();
         },
 
@@ -734,6 +770,20 @@ sap.ui.define([
         },
 
         onClauseFilterChange: function () {
+            this._applyClauseFilters();
+        },
+
+        onClearClauseFilters: function () {
+            const oModel = this.getView().getModel("app");
+            const oAppContext = oModel.getProperty("/appContext") || {};
+
+            oModel.setProperty("/filters/clauseText", "");
+            oModel.setProperty("/filters/clauseCategory", oAppContext.category || "");
+            oModel.setProperty("/filters/clauseStatus", "");
+            oModel.setProperty("/filters/clauseType", "");
+            oModel.setProperty("/filters/clauseClass", "");
+            oModel.setProperty("/filters/clauseGoverningLaw", "");
+            oModel.setProperty("/filters/clauseLanguage", "");
             this._applyClauseFilters();
         },
 
@@ -1473,18 +1523,19 @@ sap.ui.define([
         },
 
         _labelForAction: function (sAction) {
-            const mLabels = {
-                SEND_FOR_APPROVAL: "Enviar a aprobación",
+            const ACTION_LABELS = {
+                SEND_FOR_APPROVAL: "Enviar aprobación",
                 APPROVE: "Aprobar",
                 RELEASE: "Liberar",
                 APPROVE_AND_RELEASE: "Aprobar + liberar",
                 REOPEN: "Reabrir",
                 ARCHIVE: "Archivar",
-                CREATE_NEW_VERSION: "Nueva versión",
+                CREATE_NEW_VERSION: "Crear versión",
+                CREATE_VARIANT: "Crear variante",
                 RESTORE: "Restaurar"
             };
 
-            return mLabels[sAction] || sAction;
+            return ACTION_LABELS[sAction] || sAction;
         },
 
         onOpenTemplateProperties: async function (oEvent) {
@@ -1514,66 +1565,178 @@ sap.ui.define([
 
         _openClausesManagementDialog: function (aClauses) {
             const sManagerId = "gpcClauseManager_" + Date.now();
-            const mClausesById = {};
-            const sCards = (aClauses || []).map(function (oClause) {
-                mClausesById[oClause.clauseId] = oClause;
-                const sLifecycleActions = (oClause.availableActions || []).map(function (sAction) {
-                    return "<button class='gpcClauseAction gpcClauseLifecycle' data-action='" + this._escapeHtml(sAction) + "' data-clause-id='" + this._escapeHtml(oClause.clauseId) + "'>" + this._escapeHtml(this._labelForAction(sAction)) + "</button>";
-                }.bind(this)).join("");
+            let aCurrentClauses = this._decorateClauses(aClauses || []);
+            let sSelectedClauseId = aCurrentClauses[0] && aCurrentClauses[0].clauseId;
+            const bCanInsertInActiveEditor = !!(this._activeRichTextEditorId && this._rteEditors && this._rteEditors[this._activeRichTextEditorId]);
+
+            const fnGetClauseById = function (sClauseId) {
+                return (aCurrentClauses || []).find(function (oClause) {
+                    return oClause.clauseId === sClauseId;
+                });
+            };
+
+            const fnActionButton = function (oClause, sAction, sGroupClass) {
+                return [
+                    "<button type='button' class='gpcClauseAction ", sGroupClass || "", "' data-action='", this._escapeHtml(sAction), "' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>",
+                    this._escapeHtml(this._labelForAction(sAction)),
+                    "</button>"
+                ].join("");
+            }.bind(this);
+
+            const fnRenderMeta = function (sLabel, vValue) {
+                const sValue = Array.isArray(vValue) ? vValue.join(", ") : vValue;
 
                 return [
-                    "<article class='gpcClauseManagerCard' data-search='", this._escapeHtml([oClause.title, oClause.category, oClause.status, oClause.class, oClause.type, oClause.governingLaw, oClause.language].join(" ").toLowerCase()), "'>",
-                    "<div class='gpcClauseManagerCardHeader'><strong>", this._escapeHtml(oClause.title), "</strong><span class='gpcManagerBadge'>", this._escapeHtml(oClause.status), "</span></div>",
-                    "<div class='gpcClauseManagerMeta'>", this._escapeHtml(oClause.version), " · ", this._escapeHtml(oClause.class), " / ", this._escapeHtml(oClause.type), " · ", this._escapeHtml(oClause.category), "</div>",
-                    "<div class='gpcClauseManagerMeta'>", this._escapeHtml(oClause.governingLaw), " · ", this._escapeHtml(oClause.language), " · ", this._escapeHtml(oClause.variantsOf ? "Variante" : "Source text block"), "</div>",
-                    "<section class='gpcClauseManagerDetail'><div class='gpcMetadataGridHtml'>",
-                    "<span><b>clauseId</b><br>", this._escapeHtml(oClause.clauseId), "</span>",
-                    "<span><b>revision</b><br>", this._escapeHtml(oClause.revision || "N/D"), "</span>",
-                    "<span><b>owner</b><br>", this._escapeHtml(oClause.owner || "GPC Legal"), "</span>",
-                    "<span><b>validFrom / validTo</b><br>", this._escapeHtml(oClause.validFrom || "N/D"), " / ", this._escapeHtml(oClause.validTo || "N/D"), "</span>",
-                    "<span><b>variantsOf</b><br>", this._escapeHtml(oClause.variantsOf || "N/D"), "</span>",
-                    "<span><b>createdFrom</b><br>", this._escapeHtml(oClause.createdFrom || "N/D"), "</span>",
-                    "</div><div class='gpcClausePreview'>", (oClause.html || "<p>Sin preview HTML.</p>"), "</div>",
-                    "<div class='gpcClauseActions'><b>Lifecycle</b><div>", sLifecycleActions || "<span>Sin acciones lifecycle.</span>", "</div>",
-                    "<b>Versionado</b><div><button class='gpcClauseAction' data-action='version' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Crear versión</button><button class='gpcClauseAction' data-action='variant' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Crear variante</button></div>",
-                    "<b>Contenido</b><div><button class='gpcClauseAction' data-action='preview' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Vista previa</button><button class='gpcClauseAction' data-action='insert' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Insertar en editor si aplica</button></div></div>",
-                    "</section></article>"
+                    "<div class='gpcClauseDetailMetaItem'><span>", this._escapeHtml(sLabel), "</span><strong>",
+                    this._escapeHtml(sValue || "N/D"),
+                    "</strong></div>"
                 ].join("");
-            }.bind(this)).join("");
+            }.bind(this);
 
-            const oHtml = new HTML({
-                sanitizeContent: false,
-                content: [
-                    "<div id='", sManagerId, "' class='gpcClauseManager'>",
-                    "<header class='gpcClauseManagerHeader'><div><h2>Gestionar text blocks / cláusulas</h2><p>Biblioteca central de cláusulas y signature blocks</p></div><span class='gpcManagerBadge'>Total: ", String((aClauses || []).length), "</span></header>",
-                    "<section class='gpcClauseManagerFilters'><input data-filter='q' placeholder='Buscar'><input data-filter='category' placeholder='Categoría'><input data-filter='status' placeholder='Estado'><input data-filter='class' placeholder='Clase'><input data-filter='type' placeholder='Tipo'><input data-filter='law' placeholder='Ley'><input data-filter='language' placeholder='Idioma'><button data-action='clear-filters'>Limpiar filtros</button></section>",
-                    "<section class='gpcClauseManagerLayout'><div class='gpcClauseManagerList'>", sCards || "<p>No hay cláusulas disponibles.</p>", "</div></section></div>"
-                ].join("")
-            });
+            const fnRender = function () {
+                const oSelectedClause = fnGetClauseById(sSelectedClauseId) || aCurrentClauses[0];
+
+                if (oSelectedClause) {
+                    sSelectedClauseId = oSelectedClause.clauseId;
+                }
+
+                const sMasterItems = (aCurrentClauses || []).map(function (oClause) {
+                    return [
+                        "<button type='button' class='gpcClauseMasterItem ", oClause.clauseId === sSelectedClauseId ? "isSelected" : "", "' ",
+                        "data-action='select' data-clause-id='", this._escapeHtml(oClause.clauseId), "' ",
+                        "data-search='", this._escapeHtml([oClause.title, oClause.description, oClause.category, oClause.status, oClause.class, oClause.type, oClause.governingLaw, oClause.language].join(" ").toLowerCase()), "' ",
+                        "data-category='", this._escapeHtml([oClause.category, (oClause.categories || []).join(" ")].join(" ").toLowerCase()), "' ",
+                        "data-status='", this._escapeHtml(String(oClause.status || "").toLowerCase()), "' ",
+                        "data-class='", this._escapeHtml(String(oClause.class || "").toLowerCase()), "' ",
+                        "data-type='", this._escapeHtml(String(oClause.type || "").toLowerCase()), "' ",
+                        "data-law='", this._escapeHtml(String(oClause.governingLaw || "").toLowerCase()), "' ",
+                        "data-language='", this._escapeHtml(String(oClause.language || "").toLowerCase()), "'>",
+                        "<span class='gpcClauseMasterTitle'>", this._escapeHtml(oClause.title || oClause.clauseId), "</span>",
+                        "<span class='gpcClauseMasterMeta'>", this._escapeHtml(oClause.version || "N/D"), " · ", this._escapeHtml(oClause.category || "N/D"), "</span>",
+                        "<span class='gpcClauseMasterMeta'>", this._escapeHtml(oClause.class || "N/D"), " / ", this._escapeHtml(oClause.type || "N/D"), "</span>",
+                        "<span class='gpcManagerBadge'>", this._escapeHtml(oClause.statusLabel || oClause.status || "N/D"), "</span>",
+                        "</button>"
+                    ].join("");
+                }.bind(this)).join("");
+
+                const aAvailableActions = (oSelectedClause && oSelectedClause.availableActions) || [];
+                const aLifecycleActions = ["SEND_FOR_APPROVAL", "APPROVE", "RELEASE", "APPROVE_AND_RELEASE", "REOPEN", "ARCHIVE"].filter(function (sAction) {
+                    return aAvailableActions.includes(sAction);
+                });
+                const aVersionActions = ["CREATE_NEW_VERSION", "CREATE_VARIANT"].filter(function (sAction) {
+                    return aAvailableActions.includes(sAction);
+                });
+                const sInsertButton = bCanInsertInActiveEditor
+                    ? fnActionButton(oSelectedClause || {}, "insert", "gpcClauseContentAction")
+                    : "<button type='button' class='gpcClauseAction gpcClauseActionDisabled' disabled title='Disponible al editar una plantilla o documento.'>Insertar en editor</button>";
+                const sPreviewHtml = oSelectedClause && oSelectedClause.html
+                    ? oSelectedClause.html
+                    : "<p class='gpcEmptyPreview'>Sin contenido disponible para previsualizar.</p>";
+                const sDetail = oSelectedClause
+                    ? [
+                        "<section class='gpcClauseDetail'>",
+                        "<div class='gpcClauseDetailHeader'><div><h3>", this._escapeHtml(oSelectedClause.title || "Text block"), "</h3><p>", this._escapeHtml(oSelectedClause.clauseId || "N/D"), "</p></div><span class='gpcManagerBadge'>", this._escapeHtml(oSelectedClause.statusLabel || oSelectedClause.status || "N/D"), "</span></div>",
+                        "<div class='gpcClauseDetailMetaGrid'>",
+                        fnRenderMeta("clauseId", oSelectedClause.clauseId),
+                        fnRenderMeta("version / revision", [oSelectedClause.version || "N/D", oSelectedClause.revision || "N/D"].join(" / ")),
+                        fnRenderMeta("status", oSelectedClause.statusLabel || oSelectedClause.status),
+                        fnRenderMeta("class", oSelectedClause.class),
+                        fnRenderMeta("type", oSelectedClause.type),
+                        fnRenderMeta("categories", oSelectedClause.categories && oSelectedClause.categories.length ? oSelectedClause.categories : oSelectedClause.category),
+                        fnRenderMeta("governingLaw", oSelectedClause.governingLaw),
+                        fnRenderMeta("language", oSelectedClause.language),
+                        fnRenderMeta("owner", oSelectedClause.owner || "GPC Legal"),
+                        fnRenderMeta("validFrom / validTo", [oSelectedClause.validFrom || "N/D", oSelectedClause.validTo || "N/D"].join(" / ")),
+                        fnRenderMeta("variantsOf", oSelectedClause.variantsOf),
+                        fnRenderMeta("createdFrom", oSelectedClause.createdFrom),
+                        fnRenderMeta("sourcePath", oSelectedClause.sourcePath || oSelectedClause.path || oSelectedClause.relativePath),
+                        "</div>",
+                        "<h4>Preview</h4><div class='gpcClausePreview'>", sPreviewHtml, "</div>",
+                        "<div class='gpcClauseActions'>",
+                        "<section><h4>A. Lifecycle</h4><div>", aLifecycleActions.map(function (sAction) { return fnActionButton(oSelectedClause, sAction, "gpcClauseLifecycle"); }).join("") || "<span class='gpcClauseEmptyAction'>Sin acciones lifecycle disponibles.</span>", "</div></section>",
+                        "<section><h4>B. Versionado</h4><div>", aVersionActions.map(function (sAction) { return fnActionButton(oSelectedClause, sAction, "gpcClauseVersionAction"); }).join("") || "<span class='gpcClauseEmptyAction'>Sin acciones de versionado disponibles.</span>", "</div></section>",
+                        "<section><h4>C. Contenido</h4><div>", fnActionButton(oSelectedClause, "preview", "gpcClauseContentAction"), sInsertButton, "</div></section>",
+                        "</div></section>"
+                    ].join("")
+                    : "<section class='gpcClauseDetail'><p>No hay cláusulas disponibles.</p></section>";
+
+                return [
+                    "<div class='gpcClauseManagerShell'>",
+                    "<header class='gpcClauseManagerHeader'><div><h2>Gestionar text blocks / cláusulas</h2><p>Biblioteca central de cláusulas y signature blocks</p></div><div class='gpcClauseHeaderStats'><span class='gpcManagerBadge'>Total: ", String((aCurrentClauses || []).length), "</span><button type='button' class='gpcClauseCloseButton' data-action='close'>Cerrar</button></div></header>",
+                    "<section class='gpcClauseManagerFilters'><input data-filter='q' placeholder='Buscar'><input data-filter='category' placeholder='Categoría'><input data-filter='status' placeholder='Estado'><input data-filter='class' placeholder='Clase'><input data-filter='type' placeholder='Tipo'><input data-filter='law' placeholder='Ley'><input data-filter='language' placeholder='Idioma'><button type='button' data-action='clear-filters'>Limpiar filtros</button></section>",
+                    "<section class='gpcClauseManagerLayout'><aside><div class='gpcClauseFilteredCounter' data-filtered-counter>Filtradas: ", String((aCurrentClauses || []).length), "</div><div class='gpcClauseManagerList'>", sMasterItems || "<p>No hay cláusulas disponibles.</p>", "</div></aside>",
+                    sDetail,
+                    "</section></div>"
+                ].join("");
+            }.bind(this);
+
+            const oHtml = new HTML({ sanitizeContent: false, content: "<div id='" + sManagerId + "' class='gpcClauseManager'>" + fnRender() + "</div>" });
 
             const oDialog = new Dialog({
                 title: "Gestionar text blocks / cláusulas",
-                contentWidth: "95%",
-                contentHeight: "82%",
+                contentWidth: "88rem",
+                contentHeight: "42rem",
                 resizable: true,
                 draggable: true,
+                verticalScrolling: false,
                 content: [oHtml],
-                endButton: new Button({ text: "Cerrar", press: function () { oDialog.close(); } }),
                 afterOpen: function () {
                     const oRoot = document.getElementById(sManagerId);
                     const fnApplyFilters = function () {
-                        const aValues = Array.from(oRoot.querySelectorAll("[data-filter]")).map(function (oInput) { return String(oInput.value || "").toLowerCase(); }).filter(Boolean);
-                        Array.from(oRoot.querySelectorAll(".gpcClauseManagerCard")).forEach(function (oCard) {
-                            const sSearch = oCard.getAttribute("data-search") || "";
-                            oCard.style.display = aValues.every(function (sValue) { return sSearch.indexOf(sValue) !== -1; }) ? "block" : "none";
+                        const aInputs = Array.from(oRoot.querySelectorAll("[data-filter]"));
+                        const mFilters = aInputs.reduce(function (mValues, oInput) {
+                            mValues[oInput.getAttribute("data-filter")] = String(oInput.value || "").toLowerCase();
+                            return mValues;
+                        }, {});
+                        let iVisible = 0;
+
+                        Array.from(oRoot.querySelectorAll(".gpcClauseMasterItem")).forEach(function (oItem) {
+                            const bVisible = Object.keys(mFilters).every(function (sKey) {
+                                const sTarget = sKey === "q"
+                                    ? (oItem.getAttribute("data-search") || "")
+                                    : (oItem.getAttribute("data-" + sKey) || "");
+
+                                return !mFilters[sKey] || sTarget.indexOf(mFilters[sKey]) !== -1;
+                            });
+
+                            oItem.style.display = bVisible ? "flex" : "none";
+                            if (bVisible) {
+                                iVisible += 1;
+                            }
                         });
+
+                        const oCounter = oRoot.querySelector("[data-filtered-counter]");
+                        if (oCounter) {
+                            oCounter.textContent = "Filtradas: " + iVisible;
+                        }
+                    };
+                    const fnRerender = function () {
+                        const mFilterValues = Array.from(oRoot.querySelectorAll("[data-filter]")).reduce(function (mValues, oInput) {
+                            mValues[oInput.getAttribute("data-filter")] = oInput.value || "";
+                            return mValues;
+                        }, {});
+
+                        oRoot.innerHTML = fnRender();
+                        Array.from(oRoot.querySelectorAll("[data-filter]")).forEach(function (oInput) {
+                            oInput.value = mFilterValues[oInput.getAttribute("data-filter")] || "";
+                        });
+                        fnApplyFilters();
                     };
 
                     oRoot.addEventListener("input", fnApplyFilters);
                     oRoot.addEventListener("click", async function (oEvent) {
-                        const oButton = oEvent.target;
+                        const oButton = oEvent.target.closest("[data-action]");
                         const sAction = oButton && oButton.getAttribute("data-action");
                         const sClauseId = oButton && oButton.getAttribute("data-clause-id");
+
+                        if (!sAction) {
+                            return;
+                        }
+
+                        if (sAction === "close") {
+                            oDialog.close();
+                            return;
+                        }
 
                         if (sAction === "clear-filters") {
                             Array.from(oRoot.querySelectorAll("[data-filter]")).forEach(function (oInput) { oInput.value = ""; });
@@ -1581,22 +1744,48 @@ sap.ui.define([
                             return;
                         }
 
-                        if (!sAction || !sClauseId) {
+                        if (sAction === "select" && sClauseId) {
+                            sSelectedClauseId = sClauseId;
+                            fnRerender();
                             return;
                         }
 
+                        if (!sClauseId) {
+                            return;
+                        }
+
+                        const oClause = fnGetClauseById(sClauseId);
+
                         if (sAction === "preview") {
-                            this._previewClause(mClausesById[sClauseId]);
+                            this._previewClause(oClause);
                             return;
                         }
 
                         if (sAction === "insert") {
-                            MessageToast.show("Inserción disponible desde el editor RichText abierto.");
+                            if (!bCanInsertInActiveEditor) {
+                                MessageToast.show("Disponible al editar una plantilla o documento.");
+                                return;
+                            }
+
+                            this._insertClauseInEditor(this._activeRichTextEditorId, oClause);
+                            MessageToast.show("Cláusula insertada: " + (oClause.title || oClause.clauseId));
                             return;
                         }
 
-                        await this._executeClauseManagerAction(sClauseId, sAction, oDialog);
+                        const oResult = await this._executeClauseManagerAction(sClauseId, sAction, oDialog);
+                        if (!oResult) {
+                            return;
+                        }
+
+                        const oNewClause = oResult && (oResult.newClause || oResult.clause);
+                        sSelectedClauseId = (oNewClause && oNewClause.clauseId) || sClauseId;
+                        aCurrentClauses = await this._refreshClausesOnly({ includeHtml: true });
+                        if (!fnGetClauseById(sSelectedClauseId) && aCurrentClauses[0]) {
+                            sSelectedClauseId = aCurrentClauses[0].clauseId;
+                        }
+                        fnRerender();
                     }.bind(this));
+                    fnApplyFilters();
                 }.bind(this),
                 afterClose: function () { oDialog.destroy(); }
             });
@@ -1604,26 +1793,31 @@ sap.ui.define([
             oDialog.open();
         },
 
-        _refreshClausesOnly: async function () {
+        _refreshClausesOnly: async function (oOptions) {
             const oModel = this.getView().getModel("app");
             const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
             const oAppContext = oModel.getProperty("/appContext") || {};
+            const bIncludeHtml = !!(oOptions && oOptions.includeHtml);
             const oClauses = await this._fetchJson(sApiBaseUrl + "/api/clauses" + this._buildQueryString({
-                category: oAppContext.category
+                category: oAppContext.category,
+                includeHtml: bIncludeHtml ? "true" : ""
             }));
+            const aClauses = this._decorateClauses(oClauses.clauses || []);
 
-            oModel.setProperty("/clauses", oClauses.clauses || []);
+            oModel.setProperty("/clauses", aClauses);
             this._applyClauseFilters();
             this._updateSummaryCards();
+
+            return aClauses;
         },
 
         _executeClauseManagerAction: async function (sClauseId, sAction, oDialog) {
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
             let sUrl;
 
-            if (sAction === "version") {
+            if (sAction === "CREATE_NEW_VERSION") {
                 sUrl = sApiBaseUrl + "/api/clauses/" + encodeURIComponent(sClauseId) + "/version";
-            } else if (sAction === "variant") {
+            } else if (sAction === "CREATE_VARIANT") {
                 sUrl = sApiBaseUrl + "/api/clauses/" + encodeURIComponent(sClauseId) + "/variant";
             } else {
                 sUrl =
@@ -1638,16 +1832,13 @@ sap.ui.define([
                 oDialog.setBusy(true);
                 const oResult = await this._fetchJson(sUrl, { method: "POST" });
                 oDialog.setBusy(false);
-                oDialog.close();
-                MessageToast.show("Acción de cláusula ejecutada");
-                await this._refreshClausesOnly();
+                MessageToast.show(this._labelForAction(sAction) + " ejecutada");
 
-                if (oResult.newClause || oResult.clause) {
-                    MessageBox.success("Text block actualizado:\n\n" + ((oResult.newClause || oResult.clause).clauseId || ""));
-                }
+                return oResult;
             } catch (oError) {
                 oDialog.setBusy(false);
                 MessageBox.error("No se pudo ejecutar la acción de cláusula:\n\n" + oError.message);
+                return null;
             }
         },
 
@@ -2854,6 +3045,7 @@ sap.ui.define([
                     }
                 }),
                 afterOpen: function () {
+                    this._activeRichTextEditorId = sEditorId;
                     setTimeout(fnApplyInitialEditorContent, 0);
                     setTimeout(fnApplyInitialEditorContent, 250);
                     const oSearch = document.getElementById(sClauseSearchId);
@@ -2891,17 +3083,7 @@ sap.ui.define([
                                 return;
                             }
 
-                            const sClauseHtml = [
-                                "<hr>",
-                                "<section data-clause-id='",
-                                this._escapeHtml(oClause.clauseId),
-                                "'>",
-                                oClause.html,
-                                "</section>",
-                                "<p><br></p>"
-                            ].join("");
-
-                            this._insertHtmlAtCursor(sEditorId, sClauseHtml);
+                            this._insertClauseInEditor(sEditorId, oClause);
 
                             MessageToast.show("Cláusula insertada: " + oClause.title);
                         }.bind(this));
@@ -2928,6 +3110,9 @@ sap.ui.define([
                     fnFilterClauses();
                 }.bind(this),
                 afterClose: function () {
+                    if (this._activeRichTextEditorId === sEditorId) {
+                        this._activeRichTextEditorId = null;
+                    }
                     delete this._rteEditors[sEditorId];
                     oDialog.destroy();
                 }.bind(this)
@@ -3110,6 +3295,24 @@ sap.ui.define([
             }
 
             this._saveEditorSelection(sEditorId);
+        },
+
+        _insertClauseInEditor: function (sEditorId, oClause) {
+            if (!oClause) {
+                return;
+            }
+
+            const sClauseHtml = [
+                "<hr>",
+                "<section data-clause-id='",
+                this._escapeHtml(oClause.clauseId),
+                "'>",
+                oClause.html || "",
+                "</section>",
+                "<p><br></p>"
+            ].join("");
+
+            this._insertHtmlAtCursor(sEditorId, sClauseHtml);
         },
 
         _insertHtmlAtCursor: function (sEditorId, sHtml) {
