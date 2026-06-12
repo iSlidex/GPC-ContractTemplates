@@ -407,6 +407,8 @@ sap.ui.define([
                     modifiedAtText: this._formatDateTime(oDocument.modifiedAt),
                     shortPath: aPathParts.slice(-3).join("/"),
                     fileBadges: this._getDocumentFileBadges(oDocument),
+                    statusCssClass: this._statusToCssClass(oDocument.status),
+                    assemblyCssClass: this._statusToCssClass(oDocument.assemblyStatus),
                     templateText: [oDocument.templateId, oDocument.templateVersion].filter(Boolean).join(" / "),
                     versionsText: (oDocument.versionCount || 1) + " archivo(s) relacionado(s)"
                 };
@@ -434,8 +436,8 @@ sap.ui.define([
                 isEmpty: aDocuments.length === 0,
                 canLoadMore: aDocuments.length < iFiltered,
                 emptyText: bHasAnyFilter
-                    ? "No hay documentos que coincidan con los filtros."
-                    : "No hay documentos generados para esta transacción. Crea un documento desde una plantilla.",
+                    ? "No hay documentos que coincidan con los filtros. Puede que el estado, tipo de archivo o alcance no aplique; limpia filtros o cambia la transacción actual."
+                    : "No hay documentos para esta transacción. Puede estar vacía porque aún no se ha generado contenido; crea un documento desde una plantilla.",
                 showCreateEmptyAction: !bHasAnyFilter,
                 showClearEmptyAction: bHasAnyFilter
             });
@@ -460,17 +462,40 @@ sap.ui.define([
                 return "Success";
             }
 
-            if (["ERROR", "ARCHIVED", "REJECTED"].includes(sNormalized)) {
+            if (["ERROR", "REJECTED"].includes(sNormalized)) {
                 return "Error";
             }
 
-            if (["PENDING", "DRAFT", "GENERATED", "SENT_FOR_APPROVAL"].includes(sNormalized)) {
+            if (["PENDING", "DRAFT"].includes(sNormalized)) {
                 return "Warning";
+            }
+
+            if (["ARCHIVED"].includes(sNormalized)) {
+                return "None";
             }
 
             return "Information";
         },
 
+        _statusToCssClass: function (sStatus) {
+            const sNormalized = String(sStatus || "").toUpperCase();
+            const mClasses = {
+                DRAFT: "gpcStatusBadge gpcStatusDraft",
+                SENT_FOR_APPROVAL: "gpcStatusBadge gpcStatusSentForApproval",
+                APPROVED: "gpcStatusBadge gpcStatusApproved",
+                RELEASED: "gpcStatusBadge gpcStatusReleased",
+                ARCHIVED: "gpcStatusBadge gpcStatusArchived",
+                REPLACED: "gpcStatusBadge gpcStatusReplaced",
+                GENERATED: "gpcStatusBadge gpcStatusGenerated",
+                PENDING: "gpcStatusBadge gpcStatusPending",
+                ERROR: "gpcStatusBadge gpcStatusError",
+                COMPLETED: "gpcStatusBadge gpcStatusCompleted",
+                FINAL: "gpcStatusBadge gpcStatusFinal",
+                SIGNED: "gpcStatusBadge gpcStatusFinal"
+            };
+
+            return mClasses[sNormalized] || "gpcStatusBadge";
+        },
 
         _labelForStatus: function (sStatus) {
             const mLabels = {
@@ -480,7 +505,12 @@ sap.ui.define([
                 RELEASED: "Liberado",
                 EXPIRED: "Expirado",
                 REPLACED: "Reemplazado",
-                ARCHIVED: "Archivado"
+                ARCHIVED: "Archivado",
+                GENERATED: "Generado",
+                PENDING: "Pendiente",
+                ERROR: "Error",
+                COMPLETED: "Completado",
+                FINAL: "Final"
             };
 
             return mLabels[String(sStatus || "").toUpperCase()] || sStatus || "N/D";
@@ -620,7 +650,9 @@ sap.ui.define([
                 return {
                     ...oTemplate,
                     recommendationText: bRecommended ? "Recomendada" : "Disponible",
-                    recommendationState: bRecommended ? "Success" : "None"
+                    recommendationState: bRecommended ? "Success" : "None",
+                    statusState: this._statusToState(oTemplate.status),
+                    statusCssClass: this._statusToCssClass(oTemplate.status)
                 };
             }.bind(this));
         },
@@ -633,6 +665,7 @@ sap.ui.define([
                 return {
                     ...oClause,
                     statusState: this._statusToState(oClause.status),
+                    statusCssClass: this._statusToCssClass(oClause.status),
                     statusLabel: this._labelForStatus(oClause.status),
                     actionLabels: aActionLabels,
                     actionLabelsText: aActionLabels.join(", ") || "Sin acciones disponibles",
@@ -774,6 +807,21 @@ sap.ui.define([
 
         onClauseFilterChange: function () {
             this._applyClauseFilters();
+        },
+
+        onClearTemplateFilters: function () {
+            const oModel = this.getView().getModel("app");
+            const oAppContext = oModel.getProperty("/appContext") || {};
+
+            oModel.setProperty("/filters/templateText", "");
+            oModel.setProperty("/filters/templateContext", oAppContext.context || "");
+            oModel.setProperty("/filters/templateCategory", oAppContext.category || "");
+            oModel.setProperty("/filters/templateContentType", "");
+            oModel.setProperty("/filters/templateGoverningLaw", "");
+            oModel.setProperty("/filters/templateLanguage", "");
+            oModel.setProperty("/filters/templateStatus", "");
+            oModel.setProperty("/filters/templateProfile", oAppContext.profile || "LEGAL_USER");
+            this._applyTemplateFilters();
         },
 
         onClearClauseFilters: function () {
@@ -1130,7 +1178,7 @@ sap.ui.define([
                                 renderType: "Bare",
                                 items: [
                                     new Button({
-                                        text: "Preview",
+                                        text: "Vista previa",
                                         icon: "sap-icon://show",
                                         type: "Transparent",
                                         enabled: !oFile.isMetadata,
@@ -1188,7 +1236,7 @@ sap.ui.define([
             const oDocumentVirtual = this._buildVirtualDocumentFromDocument(oItem);
             const oVariablesTab = new IconTabFilter({
                 key: "variables",
-                text: "Variables/Input fields",
+                text: "Variables SAP / Campos de usuario",
                 content: [
                     this._createKeyValueTable(
                         "Variables SAP",
@@ -1196,9 +1244,9 @@ sap.ui.define([
                         "No hay variables SAP registradas para este documento."
                     ),
                     this._createKeyValueTable(
-                        "Input fields",
+                        "Campos de usuario",
                         this._normalizeInputFieldsForDisplay(oDocumentVirtual.inputFields || {}, oDocumentVirtual.variableDefinitions || [], oDocumentVirtual.values || {}),
-                        "No hay input fields registrados para este documento."
+                        "No hay campos de usuario registrados para este documento. La plantilla puede no requerir captura manual."
                     )
                 ]
             });
@@ -1242,7 +1290,7 @@ sap.ui.define([
                                 wrap: "Wrap",
                                 items: [
                                     new Button({ text: "Descargar", icon: "sap-icon://download", press: function () { this._downloadRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Preview", icon: "sap-icon://show", press: function () { this._previewRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Vista previa", icon: "sap-icon://show", press: function () { this._previewRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
                                     new Button({ text: "Editar RichText", icon: "sap-icon://edit", press: function () { this._editRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
                                     new Button({ text: "Versiones", icon: "sap-icon://history", press: function () { oTabBar.setSelectedKey("files"); } }).addStyleClass("sapUiTinyMarginEnd"),
                                     new Button({ text: "Ver ensamblaje", icon: "sap-icon://synchronize", type: "Emphasized", press: function () {
@@ -1705,25 +1753,25 @@ sap.ui.define([
                 const sDetail = oSelectedClause
                     ? [
                         "<section class='gpcClauseDetail'>",
-                        "<div class='gpcClauseDetailHeader'><div><h3>", this._escapeHtml(oSelectedClause.title || "Text block"), "</h3><p>", this._escapeHtml(oSelectedClause.clauseId || "N/D"), "</p></div><span class='gpcManagerBadge'>", this._escapeHtml(oSelectedClause.statusLabel || oSelectedClause.status || "N/D"), "</span></div>",
+                        "<div class='gpcClauseDetailHeader'><div><h3>", this._escapeHtml(oSelectedClause.title || "Cláusula (text block)"), "</h3><p>", this._escapeHtml(oSelectedClause.clauseId || "N/D"), "</p></div><span class='gpcManagerBadge'>", this._escapeHtml(oSelectedClause.statusLabel || oSelectedClause.status || "N/D"), "</span></div>",
                         "<div class='gpcClauseDetailMetaGrid'>",
-                        fnRenderMeta("clauseId", oSelectedClause.clauseId),
-                        fnRenderMeta("version / revision", [oSelectedClause.version || "N/D", oSelectedClause.revision || "N/D"].join(" / ")),
-                        fnRenderMeta("status", oSelectedClause.statusLabel || oSelectedClause.status),
-                        fnRenderMeta("class", oSelectedClause.class),
-                        fnRenderMeta("type", oSelectedClause.type),
-                        fnRenderMeta("categories", oSelectedClause.categories && oSelectedClause.categories.length ? oSelectedClause.categories : oSelectedClause.category),
-                        fnRenderMeta("governingLaw", oSelectedClause.governingLaw),
-                        fnRenderMeta("language", oSelectedClause.language),
-                        fnRenderMeta("owner", oSelectedClause.owner || "GPC Legal"),
-                        fnRenderMeta("validFrom / validTo", [oSelectedClause.validFrom || "N/D", oSelectedClause.validTo || "N/D"].join(" / ")),
-                        fnRenderMeta("variantsOf", oSelectedClause.variantsOf),
-                        fnRenderMeta("createdFrom", oSelectedClause.createdFrom),
-                        fnRenderMeta("sourcePath", oSelectedClause.sourcePath || oSelectedClause.path || oSelectedClause.relativePath),
+                        fnRenderMeta("ID cláusula", oSelectedClause.clauseId),
+                        fnRenderMeta("Versión / revisión", [oSelectedClause.version || "N/D", oSelectedClause.revision || "N/D"].join(" / ")),
+                        fnRenderMeta("Estado", oSelectedClause.statusLabel || oSelectedClause.status),
+                        fnRenderMeta("Clase", oSelectedClause.class),
+                        fnRenderMeta("Tipo", oSelectedClause.type),
+                        fnRenderMeta("Categorías", oSelectedClause.categories && oSelectedClause.categories.length ? oSelectedClause.categories : oSelectedClause.category),
+                        fnRenderMeta("Ley aplicable", oSelectedClause.governingLaw),
+                        fnRenderMeta("Idioma", oSelectedClause.language),
+                        fnRenderMeta("Responsable", oSelectedClause.owner || "GPC Legal"),
+                        fnRenderMeta("Vigencia", [oSelectedClause.validFrom || "N/D", oSelectedClause.validTo || "N/D"].join(" / ")),
+                        fnRenderMeta("Variante de", oSelectedClause.variantsOf),
+                        fnRenderMeta("Creada desde", oSelectedClause.createdFrom),
+                        fnRenderMeta("Ruta técnica", oSelectedClause.sourcePath || oSelectedClause.path || oSelectedClause.relativePath),
                         "</div>",
-                        "<h4>Preview</h4><div class='gpcClausePreview'>", sPreviewHtml, "</div>",
+                        "<h4>Vista previa</h4><div class='gpcClausePreview'>", sPreviewHtml, "</div>",
                         "<div class='gpcClauseActions'>",
-                        "<section><h4>A. Lifecycle</h4><div>", aLifecycleActions.map(function (sAction) { return fnActionButton(oSelectedClause, sAction, "gpcClauseLifecycle"); }).join("") || "<span class='gpcClauseEmptyAction'>Sin acciones lifecycle disponibles.</span>", "</div></section>",
+                        "<section><h4>A. Estado y aprobación</h4><div>", aLifecycleActions.map(function (sAction) { return fnActionButton(oSelectedClause, sAction, "gpcClauseLifecycle"); }).join("") || "<span class='gpcClauseEmptyAction'>Sin acciones de estado disponibles para esta cláusula.</span>", "</div></section>",
                         "<section><h4>B. Versionado</h4><div>", aVersionActions.map(function (sAction) { return fnActionButton(oSelectedClause, sAction, "gpcClauseVersionAction"); }).join("") || "<span class='gpcClauseEmptyAction'>Sin acciones de versionado disponibles.</span>", "</div></section>",
                         "<section><h4>C. Contenido</h4><div>", fnActionButton(oSelectedClause, "preview", "gpcClauseContentAction"), sInsertButton, "</div></section>",
                         "</div></section>"
@@ -1732,7 +1780,7 @@ sap.ui.define([
 
                 return [
                     "<div class='gpcClauseManagerShell'>",
-                    "<header class='gpcClauseManagerHeader'><div><h2>Gestionar text blocks / cláusulas</h2><p>Biblioteca central de cláusulas y signature blocks</p></div><div class='gpcClauseHeaderStats'><span class='gpcManagerBadge'>Total: ", String((aCurrentClauses || []).length), "</span><button type='button' class='gpcClauseCloseButton' data-action='close'>Cerrar</button></div></header>",
+                    "<header class='gpcClauseManagerHeader'><div><h2>Gestionar cláusulas (text blocks)</h2><p>Biblioteca central de cláusulas (text blocks) y bloques de firma</p></div><div class='gpcClauseHeaderStats'><span class='gpcManagerBadge'>Total: ", String((aCurrentClauses || []).length), "</span><button type='button' class='gpcClauseCloseButton' data-action='close'>Cerrar</button></div></header>",
                     "<section class='gpcClauseManagerFilters'><input data-filter='q' placeholder='Buscar'><input data-filter='category' placeholder='Categoría'><input data-filter='status' placeholder='Estado'><input data-filter='class' placeholder='Clase'><input data-filter='type' placeholder='Tipo'><input data-filter='law' placeholder='Ley'><input data-filter='language' placeholder='Idioma'><button type='button' data-action='clear-filters'>Limpiar filtros</button></section>",
                     "<section class='gpcClauseManagerLayout'><aside><div class='gpcClauseFilteredCounter' data-filtered-counter>Filtradas: ", String((aCurrentClauses || []).length), "</div><div class='gpcClauseManagerList'>", sMasterItems || "<p>No hay cláusulas disponibles.</p>", "</div></aside>",
                     sDetail,
@@ -1743,7 +1791,7 @@ sap.ui.define([
             const oHtml = new HTML({ sanitizeContent: false, content: "<div id='" + sManagerId + "' class='gpcClauseManager'>" + fnRender() + "</div>" });
 
             const oDialog = new Dialog({
-                title: "Gestionar text blocks / cláusulas",
+                title: "Gestionar cláusulas (text blocks)",
                 contentWidth: "88rem",
                 contentHeight: "42rem",
                 resizable: true,
@@ -1916,14 +1964,14 @@ sap.ui.define([
             const oInputs = {};
             const aFields = [
                 ["name", "Nombre"],
-                ["contentType", "Content type"],
+                ["contentType", "Tipo documental"],
                 ["categories", "Categorías"],
-                ["governingLaw", "Governing law"],
+                ["governingLaw", "Ley aplicable"],
                 ["language", "Idioma"],
                 ["description", "Descripción"],
                 ["validFrom", "Válido desde"],
                 ["validTo", "Válido hasta"],
-                ["owner", "Owner"]
+                ["owner", "Responsable"]
             ];
 
             const oBox = new VBox({ width: "100%" }).addStyleClass("sapUiMediumMargin");
@@ -1981,7 +2029,7 @@ sap.ui.define([
             oBox.addItem(oActionBox);
 
             const oDialog = new Dialog({
-                title: "Propiedades / Ciclo de vida",
+                title: "Propiedades y estado de plantilla",
                 contentWidth: "720px",
                 contentHeight: "760px",
                 verticalScrolling: true,
@@ -1989,7 +2037,7 @@ sap.ui.define([
                 draggable: true,
                 content: [oBox],
                 beginButton: new Button({
-                    text: "Guardar metadata",
+                    text: "Guardar propiedades",
                     type: "Emphasized",
                     press: async function () {
                         await this._saveTemplateMetadata(oTemplate.templateId, oInputs, oDialog);
@@ -2032,11 +2080,11 @@ sap.ui.define([
                 );
                 oDialog.setBusy(false);
                 oDialog.close();
-                MessageToast.show("Metadata de plantilla guardada");
+                MessageToast.show("Propiedades de plantilla guardadas");
                 await this._refreshTemplatesAndRepository();
             } catch (oError) {
                 oDialog.setBusy(false);
-                MessageBox.error("No se pudo guardar metadata:\n\n" + oError.message);
+                MessageBox.error("No se pudieron guardar las propiedades:\n\n" + oError.message);
             }
         },
 
@@ -3006,7 +3054,7 @@ sap.ui.define([
             return this._toKeyValueRows(vInputFields, {
                 definitions: aDefinitions,
                 values: mValues,
-                defaultType: "Input field",
+                defaultType: "Campo de usuario",
                 defaultSource: "Usuario",
                 completedStatus: "Completado",
                 missingStatus: "Pendiente"
@@ -3032,7 +3080,7 @@ sap.ui.define([
             };
             this._syncVirtualDocumentDisplay();
             this._updateSummaryCards();
-            MessageToast.show("Documento ligado al ensamblaje");
+            MessageToast.show("Documento virtual seleccionado para ensamblaje");
         },
 
         _buildVirtualDocumentFromDocument: function (oDocument) {
@@ -3111,6 +3159,7 @@ sap.ui.define([
                     contractNumber: oVirtualDocument.contractNumber || "N/D",
                     status: oVirtualDocument.status || "PENDING",
                     statusState: this._statusToState(oVirtualDocument.status),
+                    statusCssClass: this._statusToCssClass(oVirtualDocument.status),
                     updatedAt: this._formatDateTime(sUpdatedAt),
                     dataSource: oVirtualDocument.dataSource || oVirtualDocument.source || "SAP/mock",
                     documentPath: oVirtualDocument.relativePath || (oVirtualDocument.primaryFile && oVirtualDocument.primaryFile.relativePath) || ""

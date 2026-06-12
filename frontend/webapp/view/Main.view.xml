@@ -51,7 +51,7 @@
                             <VBox id="generalInfoContent" class="gpcTabContent gpcSummaryContent">
                                 <VBox class="gpcSummaryIntro">
                                     <Title text="Una transacción legal → sus documentos → sus plantillas recomendadas → sus cláusulas → su ensamblaje" level="H3" />
-                                    <Text text="Este resumen explica qué transacción legal estás viendo y qué contexto usa la app para filtrar documentos, plantillas y text blocks recomendados." />
+                                    <Text text="Este resumen explica qué transacción legal estás viendo y qué contexto usa la app para filtrar documentos, plantillas y cláusulas (text blocks) recomendadas." />
                                 </VBox>
 
                                 <HBox wrap="Wrap" class="gpcSummaryGrid">
@@ -62,7 +62,7 @@
                                                     <ObjectIdentifier title="{app>/appContext/legalTransactionDisplayName}" text="Gestión documental de contratos" class="gpcHeroIdentifier" />
                                                     <HBox wrap="Wrap" class="gpcReadableGrid">
                                                         <VBox class="gpcReadableItem"><Label text="ID transacción legal" /><Text text="{app>/appContext/legalTransactionId}" /></VBox>
-                                                        <VBox class="gpcReadableItem"><Label text="Contract ID SAP/mock" /><Text text="{app>/appContext/legalTransactionId}" /></VBox>
+                                                        <VBox class="gpcReadableItem"><Label text="ID contrato SAP/mock" /><Text text="{app>/appContext/legalTransactionId}" /></VBox>
                                                         <VBox class="gpcReadableItem"><Label text="Estado" /><ObjectStatus text="{app>/appContext/status}" state="Information" /></VBox>
                                                         <VBox class="gpcReadableItem"><Label text="Responsable" /><Text text="{app>/appContext/owner}" /></VBox>
                                                         <VBox class="gpcReadableItem"><Label text="Perfil simulado" /><ObjectStatus text="{app>/appContext/profile}" state="Warning" /></VBox>
@@ -76,13 +76,13 @@
                                         <Panel headerText="Contexto documental" class="gpcEcmCard gpcSummaryCard" expandable="false">
                                             <content>
                                                 <VBox class="gpcSummaryCardBody">
-                                                    <Text text="Estos valores filtran las plantillas y text blocks recomendados para crear documentos." class="gpcCardLead" />
+                                                    <Text text="Estos valores filtran las plantillas y cláusulas (text blocks) recomendadas para crear documentos." class="gpcCardLead" />
                                                     <HBox wrap="Wrap" class="gpcReadableGrid">
                                                         <VBox class="gpcReadableItem"><Label text="Contexto" /><Text text="{app>/appContext/context}" /></VBox>
                                                         <VBox class="gpcReadableItem"><Label text="Categoría" /><Text text="{= ${app>/appContext/category} || 'Todas' }" /></VBox>
-                                                        <VBox class="gpcReadableItem"><Label text="Governing Law" /><Text text="República Dominicana" /></VBox>
+                                                        <VBox class="gpcReadableItem"><Label text="Ley aplicable" /><Text text="República Dominicana" /></VBox>
                                                         <VBox class="gpcReadableItem"><Label text="Idioma" /><Text text="es" /></VBox>
-                                                        <VBox class="gpcReadableItem"><Label text="Content Type preferido" /><Text text="Contrato" /></VBox>
+                                                        <VBox class="gpcReadableItem"><Label text="Tipo documental preferido" /><Text text="Contrato" /></VBox>
                                                     </HBox>
                                                 </VBox>
                                             </content>
@@ -162,8 +162,8 @@
                                             <Select width="10rem" selectedKey="{app>/filters/documentStatus}" change=".onDocumentFilterChange"><core:Item key="" text="Estado: todos" /><core:Item key="GENERATED" text="GENERATED" /><core:Item key="DRAFT" text="DRAFT" /><core:Item key="FINAL" text="FINAL" /><core:Item key="SIGNED" text="SIGNED" /><core:Item key="ARCHIVED" text="ARCHIVED" /></Select>
                                             <Select width="12rem" selectedKey="{app>/filters/documentAssemblyStatus}" change=".onDocumentFilterChange"><core:Item key="" text="Ensamblaje: todos" /><core:Item key="PENDING" text="PENDING" /><core:Item key="ERROR" text="ERROR" /><core:Item key="COMPLETED" text="COMPLETED" /><core:Item key="FINAL" text="FINAL" /></Select>
                                             <Input width="14rem" placeholder="Plantilla" value="{app>/filters/documentTemplateId}" liveChange=".onDocumentFilterChange" />
-                                            <Input width="12rem" placeholder="Contract ID" value="{app>/filters/documentContractId}" liveChange=".onDocumentFilterChange" />
-                                            <Select width="12rem" selectedKey="{app>/filters/documentScope}" change=".onDocumentFilterChange"><core:Item key="current" text="Solo contrato actual" /><core:Item key="all" text="Todos" /></Select>
+                                            <Input width="12rem" placeholder="ID contrato" value="{app>/filters/documentContractId}" liveChange=".onDocumentFilterChange" />
+                                            <Select width="12rem" selectedKey="{app>/filters/documentScope}" change=".onDocumentFilterChange"><core:Item key="current" text="Solo transacción actual" /><core:Item key="all" text="Todas" /></Select>
                                             <Select width="12rem" selectedKey="{app>/filters/documentSortBy}" change=".onDocumentFilterChange"><core:Item key="modifiedAt" text="Más reciente" /><core:Item key="displayName" text="Nombre" /><core:Item key="status" text="Estado" /><core:Item key="templateId" text="Plantilla" /></Select>
                                             <Select width="8rem" selectedKey="{app>/filters/documentSortDirection}" change=".onDocumentFilterChange"><core:Item key="desc" text="Desc" /><core:Item key="asc" text="Asc" /></Select>
                                             <Button text="Limpiar" icon="sap-icon://clear-filter" press=".onClearDocumentFilters" />
@@ -172,7 +172,7 @@
                                     </content>
                                 </Panel>
 
-                                <Table id="documentsTable" items="{app>/documents}" inset="false" class="gpcEcmCard sapUiSmallMarginTop">
+                                <Table id="documentsTable" items="{app>/documents}" inset="false" class="gpcEcmCard sapUiSmallMarginTop gpcReadableTable" noDataText="No hay documentos para esta transacción. Puede estar vacío si aún no se generó ningún archivo; crea un documento desde una plantilla.">
                                     <columns>
                                         <Column width="20rem"><Text text="Documento" /></Column>
                                         <Column width="10rem"><Text text="Contrato" /></Column>
@@ -195,11 +195,11 @@
                                                 <Text text="{app>contractNumber}" />
                                                 <ObjectIdentifier title="{app>templateId}" text="{app>templateVersion}" />
                                                 <ObjectStatus text="{app>fileType}" state="Information" />
-                                                <ObjectStatus text="{app>status}" state="{app>statusState}" class="gpcStatusBadge" />
-                                                <ObjectStatus text="{app>assemblyStatus}" state="{app>assemblyState}" class="gpcStatusBadge" />
+                                                <ObjectStatus text="{app>status}" state="{app>statusState}" class="{app>statusCssClass}" />
+                                                <ObjectStatus text="{app>assemblyStatus}" state="{app>assemblyState}" class="{app>assemblyCssClass}" />
                                                 <Text text="{app>modifiedAtText}" />
                                                 <HBox renderType="Bare" wrap="Wrap">
-                                                    <Button text="Preview" icon="sap-icon://show" type="Transparent" press=".onDocumentPreview" />
+                                                    <Button text="Vista previa" icon="sap-icon://show" type="Transparent" press=".onDocumentPreview" />
                                                     <Button text="Descargar" icon="sap-icon://download" type="Transparent" press=".onDocumentDownload" />
                                                     <Button text="Editar" icon="sap-icon://edit" type="Transparent" press=".onDocumentEdit" />
                                                     <Button text="Detalle" icon="sap-icon://detail-view" type="Transparent" press=".onDocumentAction" />
@@ -245,8 +245,8 @@
                                             <Input width="14rem" placeholder="Buscar texto" value="{app>/filters/templateText}" liveChange=".onTemplateFilterChange" />
                                             <Input width="12rem" placeholder="Contexto" value="{app>/filters/templateContext}" liveChange=".onTemplateFilterChange" />
                                             <Input width="16rem" placeholder="Categoría" value="{app>/filters/templateCategory}" liveChange=".onTemplateFilterChange" />
-                                            <Input width="10rem" placeholder="Content Type" value="{app>/filters/templateContentType}" liveChange=".onTemplateFilterChange" />
-                                            <Input width="9rem" placeholder="Governing Law" value="{app>/filters/templateGoverningLaw}" liveChange=".onTemplateFilterChange" />
+                                            <Input width="10rem" placeholder="Tipo documental" value="{app>/filters/templateContentType}" liveChange=".onTemplateFilterChange" />
+                                            <Input width="9rem" placeholder="Ley aplicable" value="{app>/filters/templateGoverningLaw}" liveChange=".onTemplateFilterChange" />
                                             <Input width="8rem" placeholder="Idioma" value="{app>/filters/templateLanguage}" liveChange=".onTemplateFilterChange" />
                                             <Select width="12rem" selectedKey="{app>/filters/templateStatus}" change=".onTemplateFilterChange">
                                                 <core:Item key="" text="Todos los estados" />
@@ -266,16 +266,16 @@
                                 </Panel>
 
                                 <ObjectStatus text="Total: {app>/templateSummary/total} · Recomendadas: {app>/templateSummary/recommended} · Ocultas por rol/perfil: {app>/templateSummary/hiddenByRole}" state="Information" class="sapUiSmallMarginTop" />
-                                <Table id="templatesTable" items="{app>/filteredTemplates}" inset="false" class="gpcEcmCard sapUiSmallMarginTop">
+                                <Table id="templatesTable" items="{app>/filteredTemplates}" inset="false" class="gpcEcmCard sapUiSmallMarginTop gpcReadableTable" noDataText="No hay plantillas que coincidan con los filtros. Puede deberse al contexto documental, categoría o perfil simulado; limpia filtros o cambia contexto/categoría.">
                                     <columns>
                                         <Column width="20rem"><Text text="Plantilla" /></Column>
                                         <Column width="12rem"><Text text="Versión" /></Column>
                                         <Column width="10rem"><Text text="Estado" /></Column>
                                         <Column width="18rem"><Text text="Categorías" /></Column>
-                                        <Column width="10rem"><Text text="Content Type" /></Column>
-                                        <Column width="10rem"><Text text="Governing Law" /></Column>
+                                        <Column width="10rem"><Text text="Tipo documental" /></Column>
+                                        <Column width="10rem"><Text text="Ley aplicable" /></Column>
                                         <Column width="8rem"><Text text="Idioma" /></Column>
-                                        <Column width="12rem"><Text text="Owner" /></Column>
+                                        <Column width="12rem"><Text text="Responsable" /></Column>
                                         <Column width="18rem"><Text text="Acciones" /></Column>
                                     </columns>
                                     <items>
@@ -286,7 +286,7 @@
                                                     <ObjectStatus text="{app>recommendationText}" state="{app>recommendationState}" />
                                                 </VBox>
                                                 <ObjectIdentifier title="{app>version}" text="Rev. {app>revision}" />
-                                                <ObjectStatus text="{app>status}" state="{app>statusState}" class="gpcStatusBadge" />
+                                                <ObjectStatus text="{app>status}" state="{app>statusState}" class="{app>statusCssClass}" />
                                                 <Text text="{app>categories}" />
                                                 <Text text="{app>contentType}" />
                                                 <Text text="{app>governingLaw}" />
@@ -301,13 +301,18 @@
                                         </ColumnListItem>
                                     </items>
                                 </Table>
+                                <VBox visible="{= !${app>/filteredTemplates}.length }" class="gpcEmptyStateBox sapUiSmallMarginTop">
+                                    <Title text="No hay plantillas que coincidan con los filtros." level="H4" />
+                                    <Text text="Puede deberse al contexto documental, categoría, estado o perfil simulado seleccionado." />
+                                    <Button text="Limpiar filtros" icon="sap-icon://clear-filter" type="Transparent" press=".onClearTemplateFilters" />
+                                </VBox>
                             </VBox>
                         </IconTabFilter>
 
                         <IconTabFilter id="clausesTab" key="clauses" text="Cláusulas" icon="sap-icon://form">
                             <VBox id="clausesContent" class="gpcTabContent">
-                                <Toolbar class="gpcCardToolbar"><VBox><Title text="Text blocks / Cláusulas" level="H3" /><Text text="Biblioteca reutilizable de cláusulas y bloques de firma" /></VBox><ToolbarSpacer /><ObjectStatus text="Total: {app>/clauseSummary/total}" state="Information" class="gpcStatusBadge" /><ObjectStatus text="Filtradas: {app>/clauseSummary/filtered}" state="Success" class="gpcStatusBadge" /></Toolbar>
-                                <Panel id="clauseFiltersPanel" headerText="Filtros de cláusulas / text blocks" class="gpcEcmCard" expandable="false">
+                                <Toolbar class="gpcCardToolbar"><VBox><Title text="Cláusulas" level="H3" /><Text text="Biblioteca reutilizable de cláusulas (text blocks) y bloques de firma" /></VBox><ToolbarSpacer /><ObjectStatus text="Total: {app>/clauseSummary/total}" state="Information" class="gpcStatusBadge" /><ObjectStatus text="Filtradas: {app>/clauseSummary/filtered}" state="Success" class="gpcStatusBadge" /></Toolbar>
+                                <Panel id="clauseFiltersPanel" headerText="Filtros de cláusulas" class="gpcEcmCard" expandable="false">
                                     <content>
                                         <HBox wrap="Wrap" class="gpcFilterBar">
                                             <Input width="14rem" placeholder="Buscar texto" value="{app>/filters/clauseText}" liveChange=".onClauseFilterChange" />
@@ -323,9 +328,9 @@
                                     </content>
                                 </Panel>
 
-                                <Table id="clausesTable" items="{app>/filteredClauses}" inset="false" class="gpcEcmCard sapUiSmallMarginTop">
+                                <Table id="clausesTable" items="{app>/filteredClauses}" inset="false" class="gpcEcmCard sapUiSmallMarginTop gpcReadableTable" noDataText="No hay cláusulas para los filtros seleccionados. Puede no existir contenido para esa categoría, estado o idioma; limpia filtros o abre el gestor.">
                                     <columns>
-                                        <Column width="20rem"><Text text="Text block" /></Column>
+                                        <Column width="20rem"><Text text="Cláusula (text block)" /></Column>
                                         <Column width="12rem"><Text text="Categoría" /></Column>
                                         <Column width="9rem"><Text text="Estado" /></Column>
                                         <Column width="9rem"><Text text="Tipo" /></Column>
@@ -340,7 +345,7 @@
                                             <cells>
                                                 <ObjectIdentifier title="{app>title}" text="{app>description}" />
                                                 <Text text="{app>category}" />
-                                                <ObjectStatus text="{app>statusLabel}" state="{app>statusState}" class="gpcStatusBadge" />
+                                                <ObjectStatus text="{app>statusLabel}" state="{app>statusState}" class="{app>statusCssClass}" />
                                                 <Text text="{app>type}" />
                                                 <Text text="{app>class}" />
                                                 <Text text="{app>governingLaw}" />
@@ -351,6 +356,14 @@
                                         </ColumnListItem>
                                     </items>
                                 </Table>
+                                <VBox visible="{= !${app>/filteredClauses}.length }" class="gpcEmptyStateBox sapUiSmallMarginTop">
+                                    <Title text="No hay cláusulas para los filtros seleccionados." level="H4" />
+                                    <Text text="Puede no existir contenido para esa categoría, estado o idioma en la biblioteca local." />
+                                    <HBox renderType="Bare" wrap="Wrap" class="sapUiSmallMarginTop">
+                                        <Button text="Limpiar filtros" icon="sap-icon://clear-filter" type="Transparent" press=".onClearClauseFilters" />
+                                        <Button text="Abrir gestor" icon="sap-icon://form" type="Emphasized" press=".onManageClauses" />
+                                    </HBox>
+                                </VBox>
                             </VBox>
                         </IconTabFilter>
 
@@ -373,20 +386,20 @@
                                 </VBox>
 
                                 <VBox visible="{app>/virtualDisplay/hasActiveDocument}">
-                                    <Panel id="virtualDocumentPanel" headerText="Documento seleccionado" class="gpcEcmCard" expandable="false">
+                                    <Panel id="virtualDocumentPanel" headerText="Documento virtual seleccionado" class="gpcEcmCard" expandable="false">
                                         <content>
                                             <HBox wrap="Wrap" class="gpcMetadataGrid">
-                                                <VBox class="gpcMetadataItem"><Label text="virtualDocumentId" /><Text text="{app>/virtualDisplay/header/virtualDocumentId}" /></VBox>
-                                                <VBox class="gpcMetadataItem"><Label text="templateId" /><Text text="{app>/virtualDisplay/header/templateId}" /></VBox>
-                                                <VBox class="gpcMetadataItem"><Label text="templateVersion" /><Text text="{app>/virtualDisplay/header/templateVersion}" /></VBox>
-                                                <VBox class="gpcMetadataItem"><Label text="contractNumber" /><Text text="{app>/virtualDisplay/header/contractNumber}" /></VBox>
-                                                <VBox class="gpcMetadataItem"><Label text="status" /><ObjectStatus text="{app>/virtualDisplay/header/status}" state="{app>/virtualDisplay/header/statusState}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="ID documento virtual" /><Text text="{app>/virtualDisplay/header/virtualDocumentId}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="ID plantilla" /><Text text="{app>/virtualDisplay/header/templateId}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Versión plantilla" /><Text text="{app>/virtualDisplay/header/templateVersion}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="ID contrato" /><Text text="{app>/virtualDisplay/header/contractNumber}" /></VBox>
+                                                <VBox class="gpcMetadataItem"><Label text="Estado" /><ObjectStatus text="{app>/virtualDisplay/header/status}" state="{app>/virtualDisplay/header/statusState}" class="{app>/virtualDisplay/header/statusCssClass}" /></VBox>
                                                 <VBox class="gpcMetadataItem"><Label text="Última actualización" /><Text text="{app>/virtualDisplay/header/updatedAt}" /></VBox>
                                                 <VBox class="gpcMetadataItem"><Label text="Fuente de datos SAP/mock" /><Text text="{app>/virtualDisplay/header/dataSource}" /></VBox>
                                             </HBox>
                                             <Text text="El refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX/PDF." class="gpcDiscreteNote sapUiSmallMarginTop" />
                                             <HBox renderType="Bare" wrap="Wrap" class="sapUiSmallMarginTop">
-                                                <Button text="Refrescar variables SAP/mock" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiTinyMarginEnd" />
+                                                <Button text="Refrescar Variables SAP" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiTinyMarginEnd" />
                                                 <Button text="Ver documento" icon="sap-icon://show" press=".onSelectedAssemblyDocumentPreview" class="sapUiTinyMarginEnd" />
                                                 <Button text="Ir al detalle" icon="sap-icon://detail-view" press=".onSelectedAssemblyDocumentDetail" />
                                             </HBox>
@@ -395,7 +408,7 @@
 
                                     <Panel headerText="Mensajes" class="sapUiSmallMarginTop gpcEcmCard" expandable="true" expanded="true">
                                         <content>
-                                            <Table items="{app>/virtualDisplay/messages}" noDataText="Sin mensajes de validación.">
+                                            <Table items="{app>/virtualDisplay/messages}" noDataText="No hay mensajes de validación. El ensamblaje no reporta pendientes por ahora.">
                                                 <columns>
                                                     <Column width="9rem"><Text text="Severidad" /></Column>
                                                     <Column><Text text="Mensaje" /></Column>
@@ -418,7 +431,7 @@
 
                                     <Panel headerText="Variables SAP" class="sapUiSmallMarginTop gpcEcmCard" expandable="true" expanded="true">
                                         <content>
-                                            <Table items="{app>/virtualDisplay/variables}" noDataText="No hay variables SAP para este documento virtual.">
+                                            <Table items="{app>/virtualDisplay/variables}" noDataText="No hay variables SAP para este documento virtual. Refresca SAP/mock o crea el documento desde una plantilla con variables.">
                                                 <columns>
                                                     <Column><Text text="Variable" /></Column>
                                                     <Column width="10rem"><Text text="Tipo" /></Column>
@@ -441,9 +454,9 @@
                                         </content>
                                     </Panel>
 
-                                    <Panel headerText="Input fields" class="sapUiSmallMarginTop gpcEcmCard" expandable="true" expanded="true">
+                                    <Panel headerText="Campos de usuario" class="sapUiSmallMarginTop gpcEcmCard" expandable="true" expanded="true">
                                         <content>
-                                            <Table items="{app>/virtualDisplay/inputFields}" noDataText="No hay input fields para este documento virtual.">
+                                            <Table items="{app>/virtualDisplay/inputFields}" noDataText="No hay campos de usuario para este documento virtual. La plantilla no requiere captura manual o aún no se cargó un documento con campos configurados.">
                                                 <columns>
                                                     <Column><Text text="Campo" /></Column>
                                                     <Column width="10rem"><Text text="Tipo" /></Column>
@@ -469,12 +482,12 @@
                             </VBox>
                         </IconTabFilter>
 
-                        <IconTabFilter id="repositoryTab" key="repository" text="Repositorio" icon="sap-icon://folder">
+                        <IconTabFilter id="repositoryTab" key="repository" text="Repositorio técnico" icon="sap-icon://folder">
                             <VBox id="repositoryContent" class="gpcTabContent">
-                                <Toolbar class="gpcCardToolbar"><VBox><Title text="Repositorio técnico de archivos y versiones" level="H3" /><Text text="Vista completa de carpetas internas, documentos generados y evidencias" /></VBox></Toolbar>
+                                <Toolbar class="gpcCardToolbar"><VBox><Title text="Repositorio técnico de archivos y versiones" level="H3" /><Text text="Vista completa de carpetas internas, versiones, documentos generados y evidencias técnicas." /></VBox></Toolbar>
                                 <Panel id="repositoryPanel" headerText="Vista técnica" expandable="false" class="gpcEcmCard">
                                     <content>
-                                        <Tree id="repositoryTree" items="{path: 'app>/repositoryTree'}">
+                                        <Tree id="repositoryTree" items="{path: 'app>/repositoryTree'}" noDataText="No hay archivos en el repositorio técnico. Puede estar vacío si aún no se generaron documentos; crea un documento desde una plantilla o recarga el backend.">
                                             <StandardTreeItem id="repositoryTreeItem" title="{app>name}" icon="{app>icon}" type="Active" press=".onRepositoryItemPress" />
                                         </Tree>
                                     </content>
