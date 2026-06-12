@@ -354,7 +354,7 @@ La generacion guarda metadata de documento virtual:
 
 ## API de documentos de negocio
 
-La vista **Documentos** consume preferentemente `GET /api/documents` para evitar mostrar el repositorio técnico como un dump de archivos. El endpoint deriva documentos de negocio desde `backend/repository/generated`, excluye metadata técnica, agrupa versiones relacionadas por base name y devuelve acciones disponibles para preview, descarga, edición y detalle.
+La vista **Documentos** consume `GET /api/documents` para evitar mostrar el repositorio técnico como un dump de archivos. La tab muestra una fila por documento lógico y reserva `GET /api/repository` para la tab **Repositorio**.
 
 Parámetros soportados:
 
@@ -364,11 +364,36 @@ Parámetros soportados:
 - `status`
 - `assemblyStatus`
 - `fileType`
+- `documentClass` / `contentType`
 - `q`
-- `limit`
-- `offset`
+- `limit` (por defecto `20`)
+- `offset` (por defecto `0`)
 - `sortBy`
 - `sortDirection`
-- `range`
+- `includeAll`
 
-Si `contractId` no encuentra coincidencia exacta, el endpoint conserva el indicador `hasExactContractMatch=false` para que la UI muestre un aviso y use documentos recientes filtrables como fallback.
+Heurística de agrupación: el backend deriva documentos desde `backend/repository/generated` y agrupa archivos por `contractNumber`, `templateId` o nombre de plantilla, versión y prefijo semántico antes de sufijos técnicos como `_GENERADO`, `_PARA_FIRMA`, `_EDITADO_BORRADOR` o `_METADATA`. La metadata JSON se adjunta como archivo relacionado y no aparece como fila principal. Para `primaryFile`, se prefiere PDF final/para firma, luego PDF, DOCX generado, DOCX y finalmente HTML borrador. Si no hay match perfecto de nombres, el agrupamiento se mantiene simple y conservador.
+
+Respuesta resumida:
+
+```json
+{
+  "documents": [
+    {
+      "documentId": "...",
+      "displayName": "...",
+      "contractNumber": "...",
+      "templateId": "...",
+      "templateVersion": "...",
+      "status": "GENERATED",
+      "assemblyStatus": "PENDING",
+      "primaryFile": { "type": "PDF", "relativePath": "..." },
+      "relatedFiles": []
+    }
+  ],
+  "total": 0,
+  "filtered": 0,
+  "limit": 20,
+  "offset": 0
+}
+```
