@@ -26,6 +26,7 @@ Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly cl
 - Generate documents with `POST /api/templates/:templateId/generate`.
 - Manage template metadata with `GET /api/templates/:templateId`, `PATCH /api/templates/:templateId/metadata`, and `POST /api/templates/:templateId/actions/:action`.
 - Refresh virtual document variables with `POST /api/virtual-documents/refresh`.
+- Browse curated business documents with `GET /api/documents`.
 - Browse repository with `GET /api/repository`.
 - Preview/download files through `/api/files/*`.
 - Edit DOCX/HTML as HTML and save HTML or DOCX versions.

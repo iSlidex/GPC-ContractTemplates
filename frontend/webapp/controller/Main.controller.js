@@ -19,6 +19,9 @@ sap.ui.define([
     "sap/m/IconTabFilter",
     "sap/m/List",
     "sap/m/StandardListItem",
+    "sap/m/Table",
+    "sap/m/Column",
+    "sap/m/ColumnListItem",
 ], function (
     Controller,
     JSONModel,
@@ -40,6 +43,9 @@ sap.ui.define([
     IconTabFilter,
     List,
     StandardListItem,
+    Table,
+    Column,
+    ColumnListItem,
 ) {
     "use strict";
 
@@ -68,7 +74,17 @@ sap.ui.define([
                     clauseType: "",
                     clauseClass: "",
                     clauseGoverningLaw: "",
-                    clauseLanguage: ""
+                    clauseLanguage: "",
+                    documentText: "",
+                    documentFileType: "",
+                    documentStatus: "",
+                    documentAssemblyStatus: "",
+                    documentCategory: oAppContext.category,
+                    documentTemplateId: "",
+                    documentContractId: oAppContext.legalTransactionId,
+                    documentRange: "recent",
+                    documentSortBy: "modifiedAt",
+                    documentSortDirection: "desc"
                 },
                 templates: [],
                 filteredTemplates: [],
@@ -76,7 +92,11 @@ sap.ui.define([
                 filteredClauses: [],
                 repositoryTree: [],
                 documents: [],
+                documentSummary: { total: 0, filtered: 0, limit: 20, offset: 0, notice: "" },
                 selectedDocument: null,
+                templateSummary: { total: 0, recommended: 0, hiddenByRole: 0 },
+                summary: { generatedDocuments: 0, recommendedTemplates: 0, availableClauses: 0, lastDataSource: "Sin consulta" },
+                virtualDisplay: { messages: [], variables: [], inputFields: [] },
                 hasGenerationResult: false,
                 generationMessage: "",
                 lastGeneration: {
@@ -96,6 +116,7 @@ sap.ui.define([
             });
 
             this.getView().setModel(oModel, "app");
+            this._syncVirtualDocumentDisplay();
             this._loadInitialData();
         },
 
@@ -161,7 +182,7 @@ sap.ui.define([
                 oModel.setProperty("/backendStatusState", "Warning");
 
                 const oAppContext = oModel.getProperty("/appContext") || {};
-                const [oTemplates, oRepository, oClauses] = await Promise.all([
+                const [oTemplates, oRepository, oClauses, oDocuments] = await Promise.all([
                     this._fetchJson(sApiBaseUrl + "/api/templates" + this._buildQueryString({
                         context: oAppContext.context,
                         category: oAppContext.category,
@@ -170,7 +191,8 @@ sap.ui.define([
                     this._fetchJson(sApiBaseUrl + "/api/repository"),
                     this._fetchJson(sApiBaseUrl + "/api/clauses" + this._buildQueryString({
                         category: oAppContext.category
-                    }))
+                    })),
+                    this._loadBusinessDocuments()
                 ]);
 
                 const aPreparedTree = this._prepareTree(oRepository.tree || []);
@@ -180,9 +202,10 @@ sap.ui.define([
                 oModel.setProperty("/templates", this._decorateTemplates(oTemplates.templates || []));
                 oModel.setProperty("/clauses", oClauses.clauses || []);
                 oModel.setProperty("/repositoryTree", aPreparedTree);
-                oModel.setProperty("/documents", this._buildDocumentRows(aPreparedTree));
+                this._setBusinessDocuments(oDocuments);
                 this._applyTemplateFilters();
                 this._applyClauseFilters();
+                this._updateSummaryCards();
 
                 MessageToast.show("Repositorio cargado correctamente");
             } catch (oError) {
@@ -277,6 +300,135 @@ sap.ui.define([
             }
 
             throw oLastError;
+        },
+
+        _loadBusinessDocuments: async function () {
+            const oModel = this.getView().getModel("app");
+            const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
+            const oFilters = oModel.getProperty("/filters") || {};
+            const oAppContext = oModel.getProperty("/appContext") || {};
+
+            return this._fetchJson(sApiBaseUrl + "/api/documents" + this._buildQueryString({
+                contractId: oFilters.documentContractId || oAppContext.legalTransactionId,
+                category: oFilters.documentCategory,
+                templateId: oFilters.documentTemplateId,
+                status: oFilters.documentStatus,
+                assemblyStatus: oFilters.documentAssemblyStatus,
+                fileType: oFilters.documentFileType,
+                q: oFilters.documentText,
+                range: oFilters.documentRange,
+                sortBy: oFilters.documentSortBy,
+                sortDirection: oFilters.documentSortDirection,
+                limit: 20,
+                offset: 0
+            }));
+        },
+
+        _setBusinessDocuments: function (oDocumentsResult) {
+            const oModel = this.getView().getModel("app");
+            const oResult = oDocumentsResult || {};
+            const aDocuments = (oResult.documents || []).map(function (oDocument) {
+                return {
+                    ...oDocument,
+                    type: "file",
+                    icon: this._getFileIcon("." + String(oDocument.fileType || "").toLowerCase()),
+                    statusState: this._statusToState(oDocument.status),
+                    assemblyState: this._statusToState(oDocument.assemblyStatus),
+                    modifiedAtText: this._formatDateTime(oDocument.modifiedAt),
+                    templateText: [oDocument.templateId, oDocument.templateVersion].filter(Boolean).join(" / "),
+                    versionsText: (oDocument.versionCount || 1) + " versión(es)"
+                };
+            }.bind(this));
+            const iFiltered = oResult.filtered || aDocuments.length;
+            const sNotice = oResult.hasExactContractMatch === false
+                ? "No se encontraron documentos con match exacto de contrato; se muestran documentos recientes filtrables."
+                : "Mostrando " + aDocuments.length + " de " + iFiltered + " documentos. Ajusta filtros para ver más.";
+
+            oModel.setProperty("/documents", aDocuments);
+            oModel.setProperty("/documentSummary", {
+                total: oResult.total || 0,
+                filtered: iFiltered,
+                limit: oResult.limit || 20,
+                offset: oResult.offset || 0,
+                notice: sNotice
+            });
+        },
+
+        _formatDateTime: function (sDate) {
+            if (!sDate) {
+                return "N/D";
+            }
+
+            try {
+                return new Date(sDate).toLocaleString();
+            } catch (oError) {
+                return sDate;
+            }
+        },
+
+        _statusToState: function (sStatus) {
+            const sNormalized = String(sStatus || "").toUpperCase();
+
+            if (["APPROVED", "RELEASED", "COMPLETED", "FINAL", "SIGNED"].includes(sNormalized)) {
+                return "Success";
+            }
+
+            if (["ERROR", "ARCHIVED", "REJECTED"].includes(sNormalized)) {
+                return "Error";
+            }
+
+            if (["PENDING", "DRAFT", "GENERATED", "SENT_FOR_APPROVAL"].includes(sNormalized)) {
+                return "Warning";
+            }
+
+            return "Information";
+        },
+
+        _updateSummaryCards: function () {
+            const oModel = this.getView().getModel("app");
+            const aTemplates = oModel.getProperty("/templates") || [];
+            const aFilteredTemplates = oModel.getProperty("/filteredTemplates") || [];
+            const aClauses = oModel.getProperty("/filteredClauses") || [];
+            const aDocuments = oModel.getProperty("/documents") || [];
+            const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
+
+            oModel.setProperty("/summary", {
+                generatedDocuments: aDocuments.length,
+                recommendedTemplates: aFilteredTemplates.filter(function (oTemplate) { return oTemplate.recommendationState === "Success"; }).length,
+                availableClauses: aClauses.length,
+                lastDataSource: oVirtualDocument.dataSource || oVirtualDocument.source || "Sin consulta"
+            });
+            oModel.setProperty("/templateSummary", {
+                total: aTemplates.length,
+                recommended: aTemplates.filter(function (oTemplate) { return oTemplate.recommendationState === "Success"; }).length,
+                hiddenByRole: Math.max(aTemplates.length - aFilteredTemplates.length, 0)
+            });
+        },
+
+        onDocumentFilterChange: async function () {
+            try {
+                this._setBusinessDocuments(await this._loadBusinessDocuments());
+                this._updateSummaryCards();
+            } catch (oError) {
+                MessageBox.error("No se pudieron aplicar los filtros de documentos:\n\n" + oError.message);
+            }
+        },
+
+        onClearDocumentFilters: async function () {
+            const oModel = this.getView().getModel("app");
+            const oAppContext = oModel.getProperty("/appContext") || {};
+
+            oModel.setProperty("/filters/documentText", "");
+            oModel.setProperty("/filters/documentFileType", "");
+            oModel.setProperty("/filters/documentStatus", "");
+            oModel.setProperty("/filters/documentAssemblyStatus", "");
+            oModel.setProperty("/filters/documentCategory", oAppContext.category || "");
+            oModel.setProperty("/filters/documentTemplateId", "");
+            oModel.setProperty("/filters/documentContractId", oAppContext.legalTransactionId || "");
+            oModel.setProperty("/filters/documentRange", "recent");
+            oModel.setProperty("/filters/documentSortBy", "modifiedAt");
+            oModel.setProperty("/filters/documentSortDirection", "desc");
+            await this.onDocumentFilterChange();
         },
 
         _prepareTree: function (aNodes) {
@@ -440,7 +592,7 @@ sap.ui.define([
                 ].join(" ");
 
                 return this._textMatches(sContextText, oFilters.templateContext) &&
-                    this._textMatches([oTemplate.category, (oTemplate.categories || []).join(" ")].join(" "), oFilters.templateCategory);
+                    (!oFilters.templateCategory || String(oFilters.templateCategory).toLowerCase() === "todas" || this._textMatches([oTemplate.category, (oTemplate.categories || []).join(" ")].join(" "), oFilters.templateCategory));
             }.bind(this));
             const aFiltered = (oFilters.templateContext || oFilters.templateCategory) && aContextFiltered.length
                 ? aContextFiltered
@@ -451,6 +603,7 @@ sap.ui.define([
             });
 
             oModel.setProperty("/filteredTemplates", aFiltered);
+            this._updateSummaryCards();
         },
 
         _applyClauseFilters: function () {
@@ -480,6 +633,7 @@ sap.ui.define([
             }.bind(this));
 
             oModel.setProperty("/filteredClauses", aFiltered);
+            this._updateSummaryCards();
         },
 
         onTemplateFilterChange: function () {
@@ -728,60 +882,75 @@ sap.ui.define([
             const oModel = this.getView().getModel("app");
             oModel.setProperty("/selectedDocument", oItem);
 
+            const fnText = function (sLabel, vValue) {
+                return new Text({ text: sLabel + ": " + this._formatValueForDisplay(vValue) });
+            }.bind(this);
             const oInfoTab = new IconTabFilter({
-                text: "Información de documento",
+                text: "Información",
                 content: [new VBox({
                     items: [
-                        new Text({ text: "Tipo de archivo: " + (oItem.fileType || oItem.extension || "N/D") }),
-                        new Text({ text: "Idioma: " + (oItem.language || "es") }),
-                        new Text({ text: "Tipo de contenido: " + (oItem.contentType || "N/D") }),
-                        new Text({ text: "Legislación aplicable: DO" }),
-                        new Text({ text: "Número de versión: " + (oItem.version || "N/D") }),
-                        new Text({ text: "Fecha de creación/modificación: " + (oItem.modifiedAt || "N/D") }),
-                        new Text({ text: "Creado por: GPC Legal" }),
-                        new Text({ text: "Modificado por: GPC Legal" }),
-                        new Text({ text: "Template source: " + (oItem.relativePath || "N/D") }),
-                        new Text({ text: "Contract number: " + ((oModel.getProperty("/appContext") || {}).legalTransactionId || "N/D") }),
-                        new Text({ text: "Estado de ensamblaje: " + (oItem.assemblyStatus || "N/D") })
+                        fnText("Nombre", oItem.name),
+                        fnText("relativePath", oItem.relativePath),
+                        fnText("contractNumber", oItem.contractNumber),
+                        fnText("templateId", oItem.templateId),
+                        fnText("templateVersion", oItem.templateVersion),
+                        fnText("fileType", oItem.fileType),
+                        fnText("contentType", oItem.contentType),
+                        fnText("category", oItem.category),
+                        fnText("language", oItem.language),
+                        fnText("status", oItem.status),
+                        fnText("assemblyStatus", oItem.assemblyStatus),
+                        fnText("generatedAt", oItem.generatedAt),
+                        fnText("modifiedAt", oItem.modifiedAt),
+                        fnText("actions", oItem.availableActions)
                     ]
                 }).addStyleClass("sapUiSmallMargin")]
             });
-            const fnPlaceholderTab = function (sText) {
-                return new IconTabFilter({
-                    text: sText,
-                    content: [new Text({ text: sText + " preparado como placeholder visual para una iteración posterior." }).addStyleClass("sapUiSmallMargin")]
-                });
-            };
+            const oVersionsTab = new IconTabFilter({
+                text: "Versiones relacionadas",
+                content: [this._createKeyValueTable("Versiones", oItem.relatedVersions || [], "No hay versiones relacionadas.")]
+            });
+            const oVariablesTab = new IconTabFilter({
+                text: "Variables/Input fields",
+                content: [
+                    this._createKeyValueTable("Variables", oItem.variables || [], "No hay variables SAP registradas para este documento."),
+                    this._createKeyValueTable("Input fields", oItem.inputFields || [], "No hay input fields registrados para este documento.")
+                ]
+            });
+            const oHistoryTab = new IconTabFilter({
+                text: "Historial / placeholders",
+                content: [new Text({ text: "Historial funcional pendiente de persistencia. Se muestran generatedAt/modifiedAt como trazabilidad disponible." }).addStyleClass("sapUiSmallMargin")]
+            });
+            const oSignatureTab = new IconTabFilter({
+                text: "e-Signature",
+                content: [new Text({ text: "Placeholder de e-Signature: integración real fuera del alcance del MVP actual." }).addStyleClass("sapUiSmallMargin")]
+            });
             const oDialog = new Dialog({
                 title: oItem.name || "Detalle de documento",
-                contentWidth: "900px",
-                contentHeight: "650px",
+                contentWidth: "980px",
+                contentHeight: "700px",
                 resizable: true,
                 draggable: true,
                 content: [
                     new VBox({
                         items: [
-                            new ObjectStatus({ text: "Estado: " + (oItem.status || "N/D"), state: oItem.statusState || "Information" }).addStyleClass("sapUiSmallMarginBottom"),
+                            new HBox({
+                                wrap: "Wrap",
+                                items: [
+                                    new ObjectStatus({ text: "Estado: " + (oItem.status || "N/D"), state: oItem.statusState || "Information" }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new ObjectStatus({ text: "Ensamblaje: " + (oItem.assemblyStatus || "N/D"), state: oItem.assemblyState || "Information" })
+                                ]
+                            }).addStyleClass("sapUiSmallMarginBottom"),
                             new HBox({
                                 wrap: "Wrap",
                                 items: [
                                     new Button({ text: "Descargar", icon: "sap-icon://download", press: function () { this._downloadRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
                                     new Button({ text: "Preview", icon: "sap-icon://show", press: function () { this._previewRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Editar", icon: "sap-icon://edit", press: function () { this._editRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Refrescar variables SAP", icon: "sap-icon://refresh", press: this.onRefreshVirtualDocument.bind(this) })
+                                    new Button({ text: "Editar RichText", icon: "sap-icon://edit", press: function () { this._editRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Ver versiones", icon: "sap-icon://history", press: function () { MessageToast.show((oItem.versionCount || 1) + " versión(es) relacionadas"); } })
                                 ]
                             }).addStyleClass("sapUiSmallMarginBottom"),
-                            new IconTabBar({
-                                items: [
-                                    oInfoTab,
-                                    fnPlaceholderTab("Categorías"),
-                                    fnPlaceholderTab("Historial de versión"),
-                                    fnPlaceholderTab("Información de plantilla"),
-                                    fnPlaceholderTab("Notas"),
-                                    fnPlaceholderTab("e-Signature"),
-                                    fnPlaceholderTab("Obligaciones")
-                                ]
-                            })
+                            new IconTabBar({ items: [oInfoTab, oVersionsTab, oVariablesTab, oHistoryTab, oSignatureTab] })
                         ]
                     }).addStyleClass("gpcContractFormContent")
                 ],
@@ -1154,7 +1323,7 @@ sap.ui.define([
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
 
             try {
-                const oResult = await this._fetchJson(sApiBaseUrl + "/api/clauses");
+                const oResult = await this._fetchJson(sApiBaseUrl + "/api/clauses?includeHtml=true");
                 this._openClausesManagementDialog(oResult.clauses || []);
             } catch (oError) {
                 MessageBox.error("No se pudo cargar la biblioteca de cláusulas:\n\n" + oError.message);
@@ -1162,89 +1331,108 @@ sap.ui.define([
         },
 
         _openClausesManagementDialog: function (aClauses) {
-            const sTableId = "gpcClauseManager_" + Date.now();
+            const sManagerId = "gpcClauseManager_" + Date.now();
             const mClausesById = {};
-            const sRows = (aClauses || []).map(function (oClause) {
+            const sCards = (aClauses || []).map(function (oClause) {
                 mClausesById[oClause.clauseId] = oClause;
+                const sLifecycleActions = (oClause.availableActions || []).map(function (sAction) {
+                    return "<button class='gpcClauseAction gpcClauseLifecycle' data-action='" + this._escapeHtml(sAction) + "' data-clause-id='" + this._escapeHtml(oClause.clauseId) + "'>" + this._escapeHtml(this._labelForAction(sAction)) + "</button>";
+                }.bind(this)).join("");
 
                 return [
-                    "<tr>",
-                    "<td>", this._escapeHtml(oClause.title), "</td>",
-                    "<td>", this._escapeHtml(oClause.version), "</td>",
-                    "<td>", this._escapeHtml(oClause.status), "</td>",
-                    "<td>", this._escapeHtml(oClause.class), "</td>",
-                    "<td>", this._escapeHtml(oClause.type), "</td>",
-                    "<td>", this._escapeHtml(oClause.governingLaw), " / ", this._escapeHtml(oClause.language), "</td>",
-                    "<td>",
-                    "<button data-action='version' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Versión</button> ",
-                    "<button data-action='variant' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Variante</button> ",
-                    (oClause.availableActions || []).map(function (sAction) {
-                        return "<button data-action='" + this._escapeHtml(sAction) + "' data-clause-id='" +
-                            this._escapeHtml(oClause.clauseId) + "'>" + this._escapeHtml(this._labelForAction(sAction)) + "</button>";
-                    }.bind(this)).join(" "),
-                    "</td>",
-                    "</tr>"
+                    "<article class='gpcClauseManagerCard' data-search='", this._escapeHtml([oClause.title, oClause.category, oClause.status, oClause.class, oClause.type, oClause.governingLaw, oClause.language].join(" ").toLowerCase()), "'>",
+                    "<div class='gpcClauseManagerCardHeader'><strong>", this._escapeHtml(oClause.title), "</strong><span class='gpcManagerBadge'>", this._escapeHtml(oClause.status), "</span></div>",
+                    "<div class='gpcClauseManagerMeta'>", this._escapeHtml(oClause.version), " · ", this._escapeHtml(oClause.class), " / ", this._escapeHtml(oClause.type), " · ", this._escapeHtml(oClause.category), "</div>",
+                    "<div class='gpcClauseManagerMeta'>", this._escapeHtml(oClause.governingLaw), " · ", this._escapeHtml(oClause.language), " · ", this._escapeHtml(oClause.variantsOf ? "Variante" : "Source text block"), "</div>",
+                    "<section class='gpcClauseManagerDetail'><div class='gpcMetadataGridHtml'>",
+                    "<span><b>clauseId</b><br>", this._escapeHtml(oClause.clauseId), "</span>",
+                    "<span><b>revision</b><br>", this._escapeHtml(oClause.revision || "N/D"), "</span>",
+                    "<span><b>owner</b><br>", this._escapeHtml(oClause.owner || "GPC Legal"), "</span>",
+                    "<span><b>validFrom / validTo</b><br>", this._escapeHtml(oClause.validFrom || "N/D"), " / ", this._escapeHtml(oClause.validTo || "N/D"), "</span>",
+                    "<span><b>variantsOf</b><br>", this._escapeHtml(oClause.variantsOf || "N/D"), "</span>",
+                    "<span><b>createdFrom</b><br>", this._escapeHtml(oClause.createdFrom || "N/D"), "</span>",
+                    "</div><div class='gpcClausePreview'>", (oClause.html || "<p>Sin preview HTML.</p>"), "</div>",
+                    "<div class='gpcClauseActions'><b>Lifecycle</b><div>", sLifecycleActions || "<span>Sin acciones lifecycle.</span>", "</div>",
+                    "<b>Versionado</b><div><button class='gpcClauseAction' data-action='version' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Crear versión</button><button class='gpcClauseAction' data-action='variant' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Crear variante</button></div>",
+                    "<b>Contenido</b><div><button class='gpcClauseAction' data-action='preview' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Vista previa</button><button class='gpcClauseAction' data-action='insert' data-clause-id='", this._escapeHtml(oClause.clauseId), "'>Insertar en editor si aplica</button></div></div>",
+                    "</section></article>"
                 ].join("");
             }.bind(this)).join("");
 
             const oHtml = new HTML({
                 sanitizeContent: false,
                 content: [
-                    "<div style='padding:1rem;overflow:auto;'>",
-                    "<table id='", sTableId, "' style='width:100%;border-collapse:collapse;'>",
-                    "<thead><tr>",
-                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Título</th>",
-                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Versión</th>",
-                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Estado</th>",
-                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Clase</th>",
-                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Tipo</th>",
-                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Ley / idioma</th>",
-                    "<th style='text-align:left;border-bottom:1px solid #ccc;'>Acciones</th>",
-                    "</tr></thead><tbody>",
-                    sRows || "<tr><td colspan='7'>No hay cláusulas disponibles.</td></tr>",
-                    "</tbody></table>",
-                    "</div>"
+                    "<div id='", sManagerId, "' class='gpcClauseManager'>",
+                    "<header class='gpcClauseManagerHeader'><div><h2>Gestionar text blocks / cláusulas</h2><p>Biblioteca central de cláusulas y signature blocks</p></div><span class='gpcManagerBadge'>Total: ", String((aClauses || []).length), "</span></header>",
+                    "<section class='gpcClauseManagerFilters'><input data-filter='q' placeholder='Buscar'><input data-filter='category' placeholder='Categoría'><input data-filter='status' placeholder='Estado'><input data-filter='class' placeholder='Clase'><input data-filter='type' placeholder='Tipo'><input data-filter='law' placeholder='Ley'><input data-filter='language' placeholder='Idioma'><button data-action='clear-filters'>Limpiar filtros</button></section>",
+                    "<section class='gpcClauseManagerLayout'><div class='gpcClauseManagerList'>", sCards || "<p>No hay cláusulas disponibles.</p>", "</div></section></div>"
                 ].join("")
             });
 
             const oDialog = new Dialog({
-                title: "Gestionar cláusulas",
+                title: "Gestionar text blocks / cláusulas",
                 contentWidth: "95%",
-                contentHeight: "75%",
+                contentHeight: "82%",
                 resizable: true,
                 draggable: true,
                 content: [oHtml],
-                endButton: new Button({
-                    text: "Cerrar",
-                    press: function () {
-                        oDialog.close();
-                    }
-                }),
+                endButton: new Button({ text: "Cerrar", press: function () { oDialog.close(); } }),
                 afterOpen: function () {
-                    const oTable = document.getElementById(sTableId);
+                    const oRoot = document.getElementById(sManagerId);
+                    const fnApplyFilters = function () {
+                        const aValues = Array.from(oRoot.querySelectorAll("[data-filter]")).map(function (oInput) { return String(oInput.value || "").toLowerCase(); }).filter(Boolean);
+                        Array.from(oRoot.querySelectorAll(".gpcClauseManagerCard")).forEach(function (oCard) {
+                            const sSearch = oCard.getAttribute("data-search") || "";
+                            oCard.style.display = aValues.every(function (sValue) { return sSearch.indexOf(sValue) !== -1; }) ? "block" : "none";
+                        });
+                    };
 
-                    if (!oTable) {
-                        return;
-                    }
-
-                    oTable.addEventListener("click", async function (oEvent) {
+                    oRoot.addEventListener("input", fnApplyFilters);
+                    oRoot.addEventListener("click", async function (oEvent) {
                         const oButton = oEvent.target;
-                        const sClauseId = oButton && oButton.getAttribute("data-clause-id");
                         const sAction = oButton && oButton.getAttribute("data-action");
+                        const sClauseId = oButton && oButton.getAttribute("data-clause-id");
 
-                        if (!sClauseId || !sAction) {
+                        if (sAction === "clear-filters") {
+                            Array.from(oRoot.querySelectorAll("[data-filter]")).forEach(function (oInput) { oInput.value = ""; });
+                            fnApplyFilters();
+                            return;
+                        }
+
+                        if (!sAction || !sClauseId) {
+                            return;
+                        }
+
+                        if (sAction === "preview") {
+                            this._previewClause(mClausesById[sClauseId]);
+                            return;
+                        }
+
+                        if (sAction === "insert") {
+                            MessageToast.show("Inserción disponible desde el editor RichText abierto.");
                             return;
                         }
 
                         await this._executeClauseManagerAction(sClauseId, sAction, oDialog);
                     }.bind(this));
                 }.bind(this),
-                afterClose: function () {
-                    oDialog.destroy();
-                }
+                afterClose: function () { oDialog.destroy(); }
             });
 
             oDialog.open();
+        },
+
+        _refreshClausesOnly: async function () {
+            const oModel = this.getView().getModel("app");
+            const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
+            const oAppContext = oModel.getProperty("/appContext") || {};
+            const oClauses = await this._fetchJson(sApiBaseUrl + "/api/clauses" + this._buildQueryString({
+                category: oAppContext.category
+            }));
+
+            oModel.setProperty("/clauses", oClauses.clauses || []);
+            this._applyClauseFilters();
+            this._updateSummaryCards();
         },
 
         _executeClauseManagerAction: async function (sClauseId, sAction, oDialog) {
@@ -1270,7 +1458,7 @@ sap.ui.define([
                 oDialog.setBusy(false);
                 oDialog.close();
                 MessageToast.show("Acción de cláusula ejecutada");
-                await this._refreshTemplatesAndRepository();
+                await this._refreshClausesOnly();
 
                 if (oResult.newClause || oResult.clause) {
                     MessageBox.success("Text block actualizado:\n\n" + ((oResult.newClause || oResult.clause).clauseId || ""));
@@ -1965,7 +2153,8 @@ sap.ui.define([
                 const aPreparedTree = this._prepareTree(oRepository.tree || []);
 
                 oModel.setProperty("/repositoryTree", aPreparedTree);
-                oModel.setProperty("/documents", this._buildDocumentRows(aPreparedTree));
+                this._setBusinessDocuments(await this._loadBusinessDocuments());
+                this._updateSummaryCards();
                 oModel.setProperty("/backendStatus", "Backend conectado");
                 oModel.setProperty("/backendStatusState", "Success");
             } catch (oError) {
@@ -1999,6 +2188,7 @@ sap.ui.define([
 
             if (oResult.result && oResult.result.metadata && oResult.result.metadata.virtualDocument) {
                 oModel.setProperty("/virtualDocument", oResult.result.metadata.virtualDocument);
+                this._syncVirtualDocumentDisplay();
             }
         },
 
@@ -2106,6 +2296,8 @@ sap.ui.define([
 
                 if (oResult.virtualDocument) {
                     this.getView().getModel("app").setProperty("/virtualDocument", oResult.virtualDocument);
+                    this._syncVirtualDocumentDisplay();
+                    this._updateSummaryCards();
                 }
 
                 MessageBox.information(
@@ -2120,6 +2312,107 @@ sap.ui.define([
                 MessageBox.error("No se pudo refrescar el documento virtual:\n\n" + oError.message);
             }
         },
+        _formatValueForDisplay: function (vValue) {
+            if (vValue === null || vValue === undefined || vValue === "") {
+                return "—";
+            }
+
+            if (Array.isArray(vValue)) {
+                return vValue.map(function (vItem) { return this._formatValueForDisplay(vItem); }.bind(this)).join(", ");
+            }
+
+            if (typeof vValue === "object") {
+                try {
+                    return JSON.stringify(vValue);
+                } catch (oError) {
+                    return "Objeto complejo";
+                }
+            }
+
+            return String(vValue);
+        },
+
+        _objectToKeyValueItems: function (vData) {
+            if (!vData) {
+                return [];
+            }
+
+            if (Array.isArray(vData)) {
+                return vData.map(function (vItem, iIndex) {
+                    if (typeof vItem === "object" && vItem !== null) {
+                        return {
+                            name: vItem.name || vItem.label || vItem.key || ("Item " + (iIndex + 1)),
+                            type: vItem.type || vItem.ecaType || "—",
+                            source: vItem.source || "—",
+                            value: this._formatValueForDisplay(vItem.value !== undefined ? vItem.value : vItem),
+                            status: vItem.status || (vItem.required ? "Requerido" : "—")
+                        };
+                    }
+
+                    return { name: "Item " + (iIndex + 1), type: "—", source: "—", value: this._formatValueForDisplay(vItem), status: "—" };
+                }.bind(this));
+            }
+
+            if (typeof vData === "object") {
+                return Object.keys(vData).map(function (sKey) {
+                    return { name: sKey, type: "—", source: "—", value: this._formatValueForDisplay(vData[sKey]), status: "—" };
+                }.bind(this));
+            }
+
+            return [{ name: "Valor", type: "—", source: "—", value: this._formatValueForDisplay(vData), status: "—" }];
+        },
+
+        _syncVirtualDocumentDisplay: function () {
+            const oModel = this.getView().getModel("app");
+
+            if (!oModel) {
+                return;
+            }
+
+            const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
+            const aMessages = this._objectToKeyValueItems(oVirtualDocument.messages || []).map(function (oItem) {
+                return { ...oItem, value: oItem.value || oItem.name };
+            });
+
+            oModel.setProperty("/virtualDisplay", {
+                messages: aMessages.length ? aMessages : [{ name: "Estado", value: "Sin mensajes del documento virtual.", type: "—", source: "—", status: "—" }],
+                variables: this._objectToKeyValueItems(oVirtualDocument.variables || []),
+                inputFields: this._objectToKeyValueItems(oVirtualDocument.inputFields || [])
+            });
+        },
+
+        _createKeyValueTable: function (sTitle, vData, sEmptyText) {
+            const aItems = this._objectToKeyValueItems(vData);
+
+            if (!aItems.length) {
+                return new VBox({ items: [new Title({ text: sTitle, level: "H5" }), new Text({ text: sEmptyText || "Sin datos." })] });
+            }
+
+            return new VBox({
+                items: [
+                    new Title({ text: sTitle, level: "H5" }),
+                    new Table({
+                        columns: [
+                            new Column({ header: new Text({ text: "Nombre" }) }),
+                            new Column({ header: new Text({ text: "Tipo" }) }),
+                            new Column({ header: new Text({ text: "Fuente" }) }),
+                            new Column({ header: new Text({ text: "Valor" }) }),
+                            new Column({ header: new Text({ text: "Estado" }) })
+                        ],
+                        items: aItems.map(function (oItem) {
+                            return new ColumnListItem({ cells: [
+                                new Text({ text: oItem.name }),
+                                new Text({ text: oItem.type }),
+                                new Text({ text: oItem.source }),
+                                new Text({ text: oItem.value }),
+                                new Text({ text: oItem.status })
+                            ] });
+                        })
+                    })
+                ]
+            }).addStyleClass("sapUiSmallMarginBottom");
+        },
+
         _editRepositoryFile: async function (oItem) {
             const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
 

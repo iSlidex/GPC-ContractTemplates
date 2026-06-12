@@ -444,6 +444,212 @@ async function generateContractDocuments({ templateId, contractNumber, values })
   };
 }
 
+
+function localFieldMatches(value, queryValue) {
+  if (!queryValue) {
+    return true;
+  }
+
+  const normalizedValue = Array.isArray(value) ? value.join(" ") : String(value || "");
+  return normalizedValue.toLowerCase().includes(String(queryValue || "").toLowerCase());
+}
+
+
+function normalizeFileType(extension) {
+  return String(extension || "").replace(".", "").toUpperCase() || "N/D";
+}
+
+function parseGeneratedName(fileName) {
+  const name = path.basename(fileName, path.extname(fileName));
+  const match = name.match(/^CTR_([^_]+)_(.+)$/i);
+
+  return {
+    contractNumber: match ? match[1] : "",
+    templateToken: match ? match[2] : name,
+    baseName: name.replace(/_METADATA$/i, "")
+  };
+}
+
+function getMetadataByContract() {
+  const metadataDir = path.join(REPO_ROOT, "generated", "metadata");
+  const metadataByContract = new Map();
+
+  if (!fs.existsSync(metadataDir)) {
+    return metadataByContract;
+  }
+
+  flattenTree(walkFiles(metadataDir, REPO_ROOT))
+    .filter((file) => file.type === "file" && file.extension === ".json")
+    .forEach((file) => {
+      try {
+        const metadata = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, file.relativePath), "utf8"));
+        const contractNumber = metadata.contractNumber || parseGeneratedName(file.name).contractNumber;
+
+        if (contractNumber) {
+          metadataByContract.set(String(contractNumber), metadata);
+        }
+      } catch (error) {
+        // Ignore invalid generated metadata; business document derivation must remain resilient.
+      }
+    });
+
+  return metadataByContract;
+}
+
+function getDocumentActions(fileType) {
+  const actions = ["PREVIEW", "DOWNLOAD", "DETAIL"];
+
+  if (["DOCX", "HTML"].includes(fileType)) {
+    actions.splice(2, 0, "EDIT");
+  }
+
+  actions.push("VERSIONS");
+  return actions;
+}
+
+function buildBusinessDocument(file, metadataByContract) {
+  const parsed = parseGeneratedName(file.name);
+  const fileType = normalizeFileType(file.extension);
+  const metadata = metadataByContract.get(String(parsed.contractNumber)) || {};
+  const template = metadata.template || {};
+  const virtualDocument = metadata.virtualDocument || {};
+  const isMetadata = fileType === "JSON" || /metadata/i.test(file.name);
+
+  if (isMetadata) {
+    return null;
+  }
+
+  const documentId = Buffer.from(file.relativePath).toString("base64url");
+  const groupKey = parsed.baseName.replace(/_(DRAFT|BORRADOR|FINAL|SIGNED|ARCHIVED|v\d+).*$/i, "");
+
+  return {
+    documentId,
+    groupKey,
+    name: file.name,
+    relativePath: file.relativePath,
+    contractNumber: metadata.contractNumber || parsed.contractNumber,
+    templateId: metadata.templateId || template.templateId || parsed.templateToken,
+    templateVersion: template.version || "N/D",
+    category: template.category || (template.categories && template.categories[0]) || "N/D",
+    documentClass: "Contrato",
+    fileType,
+    extension: file.extension,
+    contentType: template.contentType || "Contrato",
+    language: template.language || "es",
+    status: metadata.status || "GENERATED",
+    assemblyStatus: virtualDocument.status || "PENDING",
+    generatedAt: metadata.generatedAt || file.modifiedAt,
+    modifiedAt: file.modifiedAt,
+    size: file.size,
+    variables: metadata.variables || [],
+    inputFields: virtualDocument.inputFields || [],
+    messages: virtualDocument.messages || [],
+    availableActions: getDocumentActions(fileType)
+  };
+}
+
+function sortBusinessDocuments(documents, sortBy, sortDirection) {
+  const field = sortBy || "modifiedAt";
+  const direction = String(sortDirection || "desc").toLowerCase() === "asc" ? 1 : -1;
+
+  return documents.sort((a, b) => {
+    const left = a[field] || "";
+    const right = b[field] || "";
+
+    if (left === right) {
+      return 0;
+    }
+
+    return left > right ? direction : -direction;
+  });
+}
+
+function getBusinessDocuments(query = {}) {
+  ensureDir(REPO_ROOT);
+
+  const limit = Math.min(Math.max(parseInt(query.limit || "20", 10) || 20, 1), 100);
+  const offset = Math.max(parseInt(query.offset || "0", 10) || 0, 0);
+  const metadataByContract = getMetadataByContract();
+  const generatedRoot = path.join(REPO_ROOT, "generated");
+  const allGeneratedFiles = flattenTree(walkFiles(generatedRoot, REPO_ROOT))
+    .filter((file) => file.type === "file" && [".docx", ".pdf", ".html"].includes(file.extension));
+
+  const documents = allGeneratedFiles
+    .map((file) => buildBusinessDocument(file, metadataByContract))
+    .filter(Boolean);
+
+  const total = documents.length;
+  const hasExactContractMatch = !query.contractId || documents.some((document) => String(document.contractNumber) === String(query.contractId));
+  let filteredDocuments = documents.filter((document) => {
+    const searchableText = [
+      document.name,
+      document.relativePath,
+      document.contractNumber,
+      document.templateId,
+      document.templateVersion,
+      document.category,
+      document.status,
+      document.assemblyStatus,
+      document.fileType
+    ].join(" ");
+
+    return localFieldMatches(searchableText, query.q) &&
+      (hasExactContractMatch ? localFieldMatches(document.contractNumber, query.contractId) : true) &&
+      localFieldMatches(document.category, query.category) &&
+      localFieldMatches(document.templateId, query.templateId) &&
+      localFieldMatches(document.status, query.status) &&
+      localFieldMatches(document.assemblyStatus, query.assemblyStatus) &&
+      localFieldMatches(document.fileType, query.fileType);
+  });
+
+  if (query.range === "recent") {
+    const recentThreshold = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    filteredDocuments = filteredDocuments.filter((document) => {
+      return new Date(document.modifiedAt || document.generatedAt || 0).getTime() >= recentThreshold;
+    });
+  }
+
+  const filtered = filteredDocuments.length;
+  const grouped = new Map();
+
+  sortBusinessDocuments(filteredDocuments, "modifiedAt", "desc").forEach((document) => {
+    const existing = grouped.get(document.groupKey);
+
+    if (!existing) {
+      grouped.set(document.groupKey, { ...document, relatedVersions: [document] });
+      return;
+    }
+
+    existing.relatedVersions.push(document);
+    existing.versionCount = existing.relatedVersions.length;
+  });
+
+  const groupedDocuments = Array.from(grouped.values()).map((document) => ({
+    ...document,
+    versionCount: document.relatedVersions.length,
+    relatedVersions: document.relatedVersions.map((version) => ({
+      documentId: version.documentId,
+      name: version.name,
+      relativePath: version.relativePath,
+      fileType: version.fileType,
+      status: version.status,
+      assemblyStatus: version.assemblyStatus,
+      modifiedAt: version.modifiedAt
+    }))
+  }));
+
+  sortBusinessDocuments(groupedDocuments, query.sortBy, query.sortDirection);
+
+  return {
+    documents: groupedDocuments.slice(offset, offset + limit),
+    total,
+    filtered,
+    limit,
+    offset,
+    hasExactContractMatch
+  };
+}
+
 function getFileForDownload(relativePath) {
   const fullPath = safeJoin(REPO_ROOT, relativePath);
 
@@ -458,6 +664,7 @@ function getFileForDownload(relativePath) {
 
 module.exports = {
   getRepositoryTree,
+  getBusinessDocuments,
   getTemplates,
   extractTemplateVariables,
   generateContractDocuments,
