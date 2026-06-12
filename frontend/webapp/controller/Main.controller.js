@@ -95,7 +95,7 @@ sap.ui.define([
                 documentSummary: { total: 0, filtered: 0, limit: 20, offset: 0, notice: "" },
                 selectedDocument: null,
                 templateSummary: { total: 0, recommended: 0, hiddenByRole: 0 },
-                summary: { generatedDocuments: 0, recommendedTemplates: 0, availableClauses: 0, lastDataSource: "Sin consulta" },
+                summary: { generatedDocuments: 0, recommendedTemplates: 0, availableClauses: 0, lastAssembly: "Pendiente", lastDataSource: "Sin consulta SAP/mock realizada.", hasVirtualDocument: false },
                 virtualDisplay: { messages: [], variables: [], inputFields: [] },
                 hasGenerationResult: false,
                 generationMessage: "",
@@ -123,14 +123,18 @@ sap.ui.define([
         _buildAppContextFromQuery: function () {
             const oParams = new URLSearchParams(window.location.search || "");
             const sProfile = oParams.get("profile") || "LEGAL_USER";
+            const sLegalTransactionName = oParams.get("transactionName") || "Contrato de arrendamiento";
+            const aRoles = [sProfile];
 
             return {
                 legalTransactionId: oParams.get("contractId") || "1000000016",
-                legalTransactionName: oParams.get("transactionName") || "CONTRATO DE ARRENDAMIENTO",
+                legalTransactionName: sLegalTransactionName,
+                legalTransactionDisplayName: this._toDisplayName(sLegalTransactionName),
                 context: oParams.get("context") || "Arrendamiento",
                 category: oParams.get("category") || "",
                 profile: sProfile,
-                roles: [sProfile],
+                roles: aRoles,
+                rolesText: aRoles.join(", "),
                 availableContexts: ["Arrendamiento", "Servicios", "Compras", "Ventas", "RRHH"],
                 availableCategories: [
                     "Arrendamiento de inmuebles",
@@ -146,6 +150,23 @@ sap.ui.define([
                 status: "En preparación",
                 owner: "GPC Legal"
             };
+        },
+
+
+        _toDisplayName: function (sValue) {
+            const aLowercaseWords = ["de", "del", "la", "las", "el", "los", "y"];
+
+            return String(sValue || "")
+                .toLocaleLowerCase("es")
+                .split(" ")
+                .map(function (sWord, iIndex) {
+                    if (iIndex > 0 && aLowercaseWords.includes(sWord)) {
+                        return sWord;
+                    }
+
+                    return sWord.charAt(0).toLocaleUpperCase("es") + sWord.slice(1);
+                })
+                .join(" ");
         },
 
         _buildQueryString: function (oParams) {
@@ -392,11 +413,20 @@ sap.ui.define([
             const aDocuments = oModel.getProperty("/documents") || [];
             const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
 
+            const bHasVirtualDocument = !!oVirtualDocument.virtualDocumentId;
+            const sLastDataSource =
+                oModel.getProperty("/lastSapDataSource") ||
+                oVirtualDocument.dataSource ||
+                oVirtualDocument.source ||
+                "Sin consulta SAP/mock realizada.";
+
             oModel.setProperty("/summary", {
                 generatedDocuments: aDocuments.length,
                 recommendedTemplates: aFilteredTemplates.filter(function (oTemplate) { return oTemplate.recommendationState === "Success"; }).length,
                 availableClauses: aClauses.length,
-                lastDataSource: oVirtualDocument.dataSource || oVirtualDocument.source || "Sin consulta"
+                lastAssembly: bHasVirtualDocument ? (oVirtualDocument.status || "Activo") : "Pendiente",
+                lastDataSource: sLastDataSource,
+                hasVirtualDocument: bHasVirtualDocument
             });
             oModel.setProperty("/templateSummary", {
                 total: aTemplates.length,
@@ -676,6 +706,15 @@ sap.ui.define([
 
         _refreshTemplatesAndRepository: async function () {
             await this._loadInitialData();
+        },
+
+
+        onGoToDocuments: function () {
+            this.byId("mainTabs").setSelectedKey("documents");
+        },
+
+        onGoToTemplates: function () {
+            this.byId("mainTabs").setSelectedKey("templates");
         },
 
         onCreateDocumentAction: function (oEvent) {
@@ -2028,6 +2067,12 @@ sap.ui.define([
                     }
                 }
 
+                oModel.setProperty(
+                    "/lastSapDataSource",
+                    oResult.fallback ? "MOCK" : "SAP OData"
+                );
+                this._updateSummaryCards();
+
                 MessageToast.show(
                     oResult.fallback
                         ? "Datos cargados desde mock"
@@ -2190,6 +2235,8 @@ sap.ui.define([
                 oModel.setProperty("/virtualDocument", oResult.result.metadata.virtualDocument);
                 this._syncVirtualDocumentDisplay();
             }
+
+            this._updateSummaryCards();
         },
 
         _showGenerationDialog: function (oResult) {
