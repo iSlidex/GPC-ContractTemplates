@@ -176,67 +176,192 @@
 }
 
 .gpcClauseManager {
-  padding: 1rem;
+  height: 100%;
   background: #f5f7fa;
-  min-height: 100%;
+  box-sizing: border-box;
+  color: #1d2d3e;
+}
+
+.gpcClauseManagerShell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+  padding: 1rem;
   box-sizing: border-box;
 }
 
-.gpcClauseManagerHeader,
-.gpcClauseManagerCardHeader {
+.gpcClauseManagerHeader {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
+  flex: 0 0 auto;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.75rem;
+  box-shadow: 0 0.25rem 0.75rem rgba(10, 55, 97, 0.06);
 }
 
-.gpcClauseManagerHeader {
-  margin-bottom: 1rem;
-}
-
-.gpcClauseManagerHeader h2 {
+.gpcClauseManagerHeader h2,
+.gpcClauseDetailHeader h3,
+.gpcClauseActions h4,
+.gpcClauseDetail h4 {
   margin: 0;
   color: #0a3761;
 }
 
 .gpcClauseManagerHeader p,
-.gpcClauseManagerMeta {
+.gpcClauseMasterMeta,
+.gpcClauseDetailHeader p {
   margin: 0.2rem 0;
   color: #5b6b7d;
+}
+
+.gpcClauseHeaderStats {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gpcClauseCloseButton,
+.gpcClauseManagerFilters button,
+.gpcClauseAction {
+  border: 1px solid #0a6ed1;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: #ffffff;
+  color: #0a6ed1;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.gpcClauseCloseButton:hover,
+.gpcClauseManagerFilters button:hover,
+.gpcClauseAction:hover {
+  background: #eef6ff;
 }
 
 .gpcClauseManagerFilters {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  flex: 0 0 auto;
   padding: 0.75rem;
-  background: #fff;
+  background: #ffffff;
   border: 1px solid #d9e2ec;
   border-radius: 0.75rem;
-  margin-bottom: 1rem;
 }
 
-.gpcClauseManagerFilters input,
-.gpcClauseManagerFilters button,
-.gpcClauseAction {
+.gpcClauseManagerFilters input {
   border: 1px solid #b8c7d6;
   border-radius: 0.5rem;
   padding: 0.45rem 0.65rem;
-  background: #fff;
+  background: #ffffff;
+  min-width: 8rem;
 }
 
-.gpcClauseManagerList {
+.gpcClauseManagerLayout {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr));
+  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
   gap: 1rem;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
-.gpcClauseManagerCard {
-  background: #fff;
+.gpcClauseManagerLayout aside,
+.gpcClauseDetail {
+  min-height: 0;
+  overflow: auto;
+  background: #ffffff;
   border: 1px solid #d9e2ec;
   border-radius: 0.9rem;
   box-shadow: 0 0.25rem 0.75rem rgba(10, 55, 97, 0.08);
+}
+
+.gpcClauseFilteredCounter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.7rem 0.85rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e5edf5;
+  color: #5b6b7d;
+  font-weight: 600;
+}
+
+.gpcClauseManagerList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.gpcClauseMasterItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.7rem;
+  background: #ffffff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gpcClauseMasterItem.isSelected {
+  border-color: #0a6ed1;
+  background: #eef6ff;
+  box-shadow: inset 0.25rem 0 0 #0a6ed1;
+}
+
+.gpcClauseMasterTitle {
+  font-weight: 700;
+  color: #0a3761;
+}
+
+.gpcClauseDetail {
   padding: 1rem;
+}
+
+.gpcClauseDetailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.gpcClauseDetailMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.gpcClauseDetailMetaItem {
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid #edf2f7;
+  border-radius: 0.6rem;
+  background: #fbfdff;
+}
+
+.gpcClauseDetailMetaItem span {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #637083;
+  font-size: 0.78rem;
+}
+
+.gpcClauseDetailMetaItem strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #1d2d3e;
 }
 
 .gpcManagerBadge {
@@ -250,36 +375,60 @@
   white-space: nowrap;
 }
 
-.gpcMetadataGridHtml {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: 0.75rem;
-  margin: 0.75rem 0;
-}
-
 .gpcClausePreview {
   border-left: 3px solid #0a6ed1;
   background: #f9fbfd;
-  padding: 0.75rem;
-  margin: 0.75rem 0;
-  max-height: 10rem;
+  padding: 0.85rem;
+  margin: 0.75rem 0 1rem;
+  max-height: 14rem;
   overflow: auto;
+}
+
+.gpcEmptyPreview,
+.gpcClauseEmptyAction {
+  color: #6a7a8a;
+  font-style: italic;
 }
 
 .gpcClauseActions {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.85rem;
+}
+
+.gpcClauseActions section {
+  padding: 0.75rem;
+  border: 1px solid #edf2f7;
+  border-radius: 0.65rem;
 }
 
 .gpcClauseActions div {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+  margin-top: 0.5rem;
 }
 
 .gpcClauseLifecycle {
   background: #e7f0fa;
   color: #0a3761;
+}
+
+.gpcClauseVersionAction {
+  border-color: #107e3e;
+  color: #107e3e;
+}
+
+.gpcClauseContentAction {
+  border-color: #0a6ed1;
+  color: #0a6ed1;
+}
+
+.gpcClauseActionDisabled,
+.gpcClauseActionDisabled:hover {
+  border-color: #c8d0d8;
+  background: #f3f5f7;
+  color: #7a8794;
+  cursor: not-allowed;
 }
 
 .gpcHeaderTitleBox {
