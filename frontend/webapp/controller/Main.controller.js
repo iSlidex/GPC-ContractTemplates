@@ -76,13 +76,14 @@ sap.ui.define([
                     clauseGoverningLaw: "",
                     clauseLanguage: "",
                     documentText: "",
+                    documentClass: "",
                     documentFileType: "",
                     documentStatus: "",
                     documentAssemblyStatus: "",
                     documentCategory: oAppContext.category,
                     documentTemplateId: "",
                     documentContractId: oAppContext.legalTransactionId,
-                    documentRange: "recent",
+                    documentScope: "current",
                     documentSortBy: "modifiedAt",
                     documentSortDirection: "desc"
                 },
@@ -92,7 +93,7 @@ sap.ui.define([
                 filteredClauses: [],
                 repositoryTree: [],
                 documents: [],
-                documentSummary: { total: 0, filtered: 0, limit: 20, offset: 0, notice: "" },
+                documentSummary: { total: 0, filtered: 0, limit: 20, offset: 0, notice: "", isEmpty: false, canLoadMore: false },
                 selectedDocument: null,
                 templateSummary: { total: 0, recommended: 0, hiddenByRole: 0 },
                 summary: { generatedDocuments: 0, recommendedTemplates: 0, availableClauses: 0, lastAssembly: "Pendiente", lastDataSource: "Sin consulta SAP/mock realizada.", hasVirtualDocument: false },
@@ -323,47 +324,101 @@ sap.ui.define([
             throw oLastError;
         },
 
-        _loadBusinessDocuments: async function () {
+        _loadBusinessDocuments: async function (oOptions) {
             const oModel = this.getView().getModel("app");
             const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
             const oFilters = oModel.getProperty("/filters") || {};
             const oAppContext = oModel.getProperty("/appContext") || {};
+            const iOffset = oOptions && Number.isFinite(oOptions.offset) ? oOptions.offset : 0;
+            const iLimit = oOptions && Number.isFinite(oOptions.limit) ? oOptions.limit : 20;
+            const bIncludeAll = oFilters.documentScope === "all";
 
             return this._fetchJson(sApiBaseUrl + "/api/documents" + this._buildQueryString({
-                contractId: oFilters.documentContractId || oAppContext.legalTransactionId,
+                contractId: bIncludeAll ? "" : (oFilters.documentContractId || oAppContext.legalTransactionId),
                 category: oFilters.documentCategory,
                 templateId: oFilters.documentTemplateId,
                 status: oFilters.documentStatus,
                 assemblyStatus: oFilters.documentAssemblyStatus,
                 fileType: oFilters.documentFileType,
+                documentClass: oFilters.documentClass,
                 q: oFilters.documentText,
-                range: oFilters.documentRange,
                 sortBy: oFilters.documentSortBy,
                 sortDirection: oFilters.documentSortDirection,
-                limit: 20,
-                offset: 0
+                includeAll: bIncludeAll ? "true" : "",
+                limit: iLimit,
+                offset: iOffset
             }));
         },
 
-        _setBusinessDocuments: function (oDocumentsResult) {
+        _getDocumentFileBadges: function (oDocument) {
+            const aRelated = oDocument.relatedFiles || [];
+            const aTypes = [];
+
+            aRelated.forEach(function (oFile) {
+                if (aTypes.indexOf(oFile.type) === -1) {
+                    aTypes.push(oFile.type);
+                }
+            });
+
+            if (!aTypes.length && oDocument.fileType) {
+                aTypes.push(oDocument.fileType);
+            }
+
+            return aTypes.map(function (sType) {
+                return {
+                    type: sType,
+                    state: sType === "METADATA" ? "None" : "Information"
+                };
+            });
+        },
+
+        _toRepositoryFileItem: function (oDocument, oFile) {
+            const oPrimary = oFile || oDocument.primaryFile || oDocument;
+            const sType = oPrimary.type || oPrimary.fileType || oDocument.fileType || "";
+
+            return {
+                ...oDocument,
+                ...oPrimary,
+                name: oPrimary.name || oDocument.name,
+                relativePath: oPrimary.relativePath || oDocument.relativePath,
+                fileType: sType,
+                extension: oPrimary.extension || (sType ? "." + String(sType).toLowerCase() : oDocument.extension)
+            };
+        },
+
+        _setBusinessDocuments: function (oDocumentsResult, bAppend) {
             const oModel = this.getView().getModel("app");
             const oResult = oDocumentsResult || {};
-            const aDocuments = (oResult.documents || []).map(function (oDocument) {
+            const aIncomingDocuments = (oResult.documents || []).map(function (oDocument) {
+                const sPath = oDocument.relativePath || (oDocument.primaryFile && oDocument.primaryFile.relativePath) || "";
+                const aPathParts = String(sPath).split(/[\/]/);
+
                 return {
                     ...oDocument,
                     type: "file",
+                    extension: oDocument.extension || (oDocument.fileType ? "." + String(oDocument.fileType).toLowerCase() : ""),
                     icon: this._getFileIcon("." + String(oDocument.fileType || "").toLowerCase()),
                     statusState: this._statusToState(oDocument.status),
                     assemblyState: this._statusToState(oDocument.assemblyStatus),
                     modifiedAtText: this._formatDateTime(oDocument.modifiedAt),
+                    shortPath: aPathParts.slice(-3).join("/"),
+                    fileBadges: this._getDocumentFileBadges(oDocument),
                     templateText: [oDocument.templateId, oDocument.templateVersion].filter(Boolean).join(" / "),
-                    versionsText: (oDocument.versionCount || 1) + " versión(es)"
+                    versionsText: (oDocument.versionCount || 1) + " archivo(s) relacionado(s)"
                 };
             }.bind(this));
+            const aExistingDocuments = bAppend ? (oModel.getProperty("/documents") || []) : [];
+            const aDocuments = aExistingDocuments.concat(aIncomingDocuments);
             const iFiltered = oResult.filtered || aDocuments.length;
-            const sNotice = oResult.hasExactContractMatch === false
-                ? "No se encontraron documentos con match exacto de contrato; se muestran documentos recientes filtrables."
-                : "Mostrando " + aDocuments.length + " de " + iFiltered + " documentos. Ajusta filtros para ver más.";
+            const bHasAnyFilter = !!(
+                (oModel.getProperty("/filters/documentText")) ||
+                (oModel.getProperty("/filters/documentClass")) ||
+                (oModel.getProperty("/filters/documentFileType")) ||
+                (oModel.getProperty("/filters/documentStatus")) ||
+                (oModel.getProperty("/filters/documentAssemblyStatus")) ||
+                (oModel.getProperty("/filters/documentTemplateId"))
+            );
+            const sNotice = "Mostrando " + aDocuments.length + " de " + iFiltered + " documentos. Ajusta filtros para ver más.";
 
             oModel.setProperty("/documents", aDocuments);
             oModel.setProperty("/documentSummary", {
@@ -371,7 +426,14 @@ sap.ui.define([
                 filtered: iFiltered,
                 limit: oResult.limit || 20,
                 offset: oResult.offset || 0,
-                notice: sNotice
+                notice: sNotice,
+                isEmpty: aDocuments.length === 0,
+                canLoadMore: aDocuments.length < iFiltered,
+                emptyText: bHasAnyFilter
+                    ? "No hay documentos que coincidan con los filtros."
+                    : "No hay documentos generados para esta transacción. Crea un documento desde una plantilla.",
+                showCreateEmptyAction: !bHasAnyFilter,
+                showClearEmptyAction: bHasAnyFilter
             });
         },
 
@@ -449,13 +511,14 @@ sap.ui.define([
             const oAppContext = oModel.getProperty("/appContext") || {};
 
             oModel.setProperty("/filters/documentText", "");
+            oModel.setProperty("/filters/documentClass", "");
             oModel.setProperty("/filters/documentFileType", "");
             oModel.setProperty("/filters/documentStatus", "");
             oModel.setProperty("/filters/documentAssemblyStatus", "");
             oModel.setProperty("/filters/documentCategory", oAppContext.category || "");
             oModel.setProperty("/filters/documentTemplateId", "");
             oModel.setProperty("/filters/documentContractId", oAppContext.legalTransactionId || "");
-            oModel.setProperty("/filters/documentRange", "recent");
+            oModel.setProperty("/filters/documentScope", "current");
             oModel.setProperty("/filters/documentSortBy", "modifiedAt");
             oModel.setProperty("/filters/documentSortDirection", "desc");
             await this.onDocumentFilterChange();
@@ -891,7 +954,7 @@ sap.ui.define([
             const oContext = this._getContextFromEvent(oEvent);
 
             if (oContext) {
-                this._previewRepositoryFile(oContext.getObject());
+                this._previewRepositoryFile(this._toRepositoryFileItem(oContext.getObject()));
             }
         },
 
@@ -899,7 +962,7 @@ sap.ui.define([
             const oContext = this._getContextFromEvent(oEvent);
 
             if (oContext) {
-                this._downloadRepositoryFile(oContext.getObject());
+                this._downloadRepositoryFile(this._toRepositoryFileItem(oContext.getObject()));
             }
         },
 
@@ -907,7 +970,27 @@ sap.ui.define([
             const oContext = this._getContextFromEvent(oEvent);
 
             if (oContext) {
-                this._editRepositoryFile(oContext.getObject());
+                this._editRepositoryFile(this._toRepositoryFileItem(oContext.getObject()));
+            }
+        },
+
+        onDocumentVersions: function (oEvent) {
+            const oContext = this._getContextFromEvent(oEvent);
+
+            if (oContext) {
+                this._openDocumentDetailDialog(oContext.getObject(), "files");
+            }
+        },
+
+        onLoadMoreDocuments: async function () {
+            const oModel = this.getView().getModel("app");
+            const aCurrent = oModel.getProperty("/documents") || [];
+
+            try {
+                this._setBusinessDocuments(await this._loadBusinessDocuments({ offset: aCurrent.length, limit: 20 }), true);
+                this._updateSummaryCards();
+            } catch (oError) {
+                MessageBox.error("No se pudieron cargar más documentos:\n\n" + oError.message);
             }
         },
 
@@ -917,7 +1000,51 @@ sap.ui.define([
             });
         },
 
-        _openDocumentDetailDialog: function (oItem) {
+        _createRelatedFilesTable: function (oDocument) {
+            const aFiles = (oDocument.relatedFiles || []).slice(0, 20);
+
+            if (!aFiles.length) {
+                return new VBox({ items: [new Text({ text: "No hay archivos relacionados para este documento." })] }).addStyleClass("sapUiSmallMargin");
+            }
+
+            return new Table({
+                columns: [
+                    new Column({ header: new Text({ text: "Tipo" }) }),
+                    new Column({ header: new Text({ text: "Ruta" }) }),
+                    new Column({ header: new Text({ text: "Fecha" }) }),
+                    new Column({ header: new Text({ text: "Acciones" }) })
+                ],
+                items: aFiles.map(function (oFile) {
+                    return new ColumnListItem({
+                        cells: [
+                            new ObjectStatus({ text: oFile.type || oFile.fileType || "N/D", state: oFile.isMetadata ? "None" : "Information" }),
+                            new Text({ text: oFile.relativePath || "N/D" }),
+                            new Text({ text: this._formatDateTime(oFile.modifiedAt) }),
+                            new HBox({
+                                renderType: "Bare",
+                                items: [
+                                    new Button({
+                                        text: "Preview",
+                                        icon: "sap-icon://show",
+                                        type: "Transparent",
+                                        enabled: !oFile.isMetadata,
+                                        press: function () { this._previewRepositoryFile(this._toRepositoryFileItem(oDocument, oFile)); }.bind(this)
+                                    }),
+                                    new Button({
+                                        text: "Descargar",
+                                        icon: "sap-icon://download",
+                                        type: "Transparent",
+                                        press: function () { this._downloadRepositoryFile(this._toRepositoryFileItem(oDocument, oFile)); }.bind(this)
+                                    })
+                                ]
+                            })
+                        ]
+                    });
+                }.bind(this))
+            });
+        },
+
+        _openDocumentDetailDialog: function (oItem, sInitialTabKey) {
             const oModel = this.getView().getModel("app");
             oModel.setProperty("/selectedDocument", oItem);
 
@@ -925,10 +1052,12 @@ sap.ui.define([
                 return new Text({ text: sLabel + ": " + this._formatValueForDisplay(vValue) });
             }.bind(this);
             const oInfoTab = new IconTabFilter({
+                key: "info",
                 text: "Información",
                 content: [new VBox({
                     items: [
-                        fnText("Nombre", oItem.name),
+                        fnText("Nombre", oItem.displayName || oItem.name),
+                        fnText("documentId", oItem.documentId),
                         fnText("relativePath", oItem.relativePath),
                         fnText("contractNumber", oItem.contractNumber),
                         fnText("templateId", oItem.templateId),
@@ -941,15 +1070,17 @@ sap.ui.define([
                         fnText("assemblyStatus", oItem.assemblyStatus),
                         fnText("generatedAt", oItem.generatedAt),
                         fnText("modifiedAt", oItem.modifiedAt),
-                        fnText("actions", oItem.availableActions)
+                        fnText("primaryFile", oItem.primaryFile && oItem.primaryFile.relativePath)
                     ]
                 }).addStyleClass("sapUiSmallMargin")]
             });
-            const oVersionsTab = new IconTabFilter({
-                text: "Versiones relacionadas",
-                content: [this._createKeyValueTable("Versiones", oItem.relatedVersions || [], "No hay versiones relacionadas.")]
+            const oFilesTab = new IconTabFilter({
+                key: "files",
+                text: "Archivos relacionados",
+                content: [this._createRelatedFilesTable(oItem)]
             });
             const oVariablesTab = new IconTabFilter({
+                key: "variables",
                 text: "Variables/Input fields",
                 content: [
                     this._createKeyValueTable("Variables", oItem.variables || [], "No hay variables SAP registradas para este documento."),
@@ -957,15 +1088,27 @@ sap.ui.define([
                 ]
             });
             const oHistoryTab = new IconTabFilter({
-                text: "Historial / placeholders",
-                content: [new Text({ text: "Historial funcional pendiente de persistencia. Se muestran generatedAt/modifiedAt como trazabilidad disponible." }).addStyleClass("sapUiSmallMargin")]
+                key: "history",
+                text: "Historial",
+                content: [
+                    new Text({
+                        text: "Historial funcional pendiente de persistencia. Por ahora se muestran archivos relacionados, generatedAt y modifiedAt como trazabilidad disponible."
+                    }).addStyleClass("sapUiSmallMargin")
+                ]
             });
             const oSignatureTab = new IconTabFilter({
+                key: "signature",
                 text: "e-Signature",
                 content: [new Text({ text: "Placeholder de e-Signature: integración real fuera del alcance del MVP actual." }).addStyleClass("sapUiSmallMargin")]
             });
+            const oTabBar = new IconTabBar({ items: [oInfoTab, oFilesTab, oVariablesTab, oHistoryTab, oSignatureTab] });
+
+            if (sInitialTabKey) {
+                oTabBar.setSelectedKey(sInitialTabKey);
+            }
+
             const oDialog = new Dialog({
-                title: oItem.name || "Detalle de documento",
+                title: oItem.displayName || oItem.name || "Detalle de documento",
                 contentWidth: "980px",
                 contentHeight: "700px",
                 resizable: true,
@@ -983,13 +1126,13 @@ sap.ui.define([
                             new HBox({
                                 wrap: "Wrap",
                                 items: [
-                                    new Button({ text: "Descargar", icon: "sap-icon://download", press: function () { this._downloadRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Preview", icon: "sap-icon://show", press: function () { this._previewRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Editar RichText", icon: "sap-icon://edit", press: function () { this._editRepositoryFile(oItem); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Ver versiones", icon: "sap-icon://history", press: function () { MessageToast.show((oItem.versionCount || 1) + " versión(es) relacionadas"); } })
+                                    new Button({ text: "Descargar", icon: "sap-icon://download", press: function () { this._downloadRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Preview", icon: "sap-icon://show", press: function () { this._previewRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Editar RichText", icon: "sap-icon://edit", press: function () { this._editRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Versiones", icon: "sap-icon://history", press: function () { oTabBar.setSelectedKey("files"); } })
                                 ]
                             }).addStyleClass("sapUiSmallMarginBottom"),
-                            new IconTabBar({ items: [oInfoTab, oVersionsTab, oVariablesTab, oHistoryTab, oSignatureTab] })
+                            oTabBar
                         ]
                     }).addStyleClass("gpcContractFormContent")
                 ],
