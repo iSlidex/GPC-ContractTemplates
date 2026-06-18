@@ -1,0 +1,40 @@
+{
+  "templateId": "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED",
+  "name": "GDL - Acuerdo de Colaboración",
+  "category": "CC",
+  "contractType": "AcuerdoColaboracionGDL",
+  "context": "Hospitalidad / Gestión Legal",
+  "excelRow": "Resumen!A5:AE5",
+  "notes": "El Excel no trae campos requeridos explícitos para este modelo; los placeholders se infirieron desde el documento y sus espacios variables.",
+  "contentType": "DOCX",
+  "categories": [
+    "CC"
+  ],
+  "governingLaw": "DO",
+  "language": "es",
+  "description": "El Excel no trae campos requeridos explícitos para este modelo; los placeholders se infirieron desde el documento y sus espacios variables.",
+  "validFrom": "",
+  "validTo": "",
+  "owner": "GPC Legal",
+  "version": "v001",
+  "revision": 1,
+  "status": "APPROVED",
+  "variables": [
+    "COLLABORATION_COMMISSION_PERCENT_NUMBER",
+    "COLLABORATION_COMMISSION_PERCENT_WORDS",
+    "COLLABORATION_CONTENT_DESCRIPTION",
+    "COLLABORATION_CONTENT_FORMAT",
+    "COLLABORATION_PURPOSE",
+    "COLLABORATOR_PROFILE_DESCRIPTION",
+    "COUNTERPARTY_ID_NUMBER",
+    "COUNTERPARTY_NAME",
+    "COUNTERPARTY_SIGNER_NAME",
+    "REQUEST_NUMBER",
+    "SIGNING_DAY_NUMBER",
+    "SIGNING_DAY_WORDS",
+    "SIGNING_MONTH",
+    "SIGNING_YEAR_NUMBER",
+    "SIGNING_YEAR_WORDS"
+  ],
+  "sourceDocument": "ACUERDO DE COLABORACION GDL_.docx"
+}

@@ -1,0 +1,1192 @@
+[
+  {
+    "name": "ALTERNATIVE_PAYMENT_TERM_DAYS_NUMBER",
+    "label": "Alternative Payment Term Days Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "ALTERNATIVE_PAYMENT_TERM_DAYS_WORDS",
+    "label": "Alternative Payment Term Days Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "BILLABLE_AMOUNT_DOP",
+    "label": "Billable Amount Dop",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "BILLABLE_AMOUNT_DOP_WORDS",
+    "label": "Billable Amount Dop Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "BILLABLE_AMOUNT_USD",
+    "label": "Billable Amount Usd",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "BILLABLE_AMOUNT_USD_WORDS",
+    "label": "Billable Amount Usd Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "BONUS_AMOUNT_DOP",
+    "label": "Bonus Amount Dop",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "BONUS_AMOUNT_DOP_WORDS",
+    "label": "Bonus Amount Dop Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "BONUS_AMOUNT_USD",
+    "label": "Bonus Amount Usd",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "BONUS_AMOUNT_USD_WORDS",
+    "label": "Bonus Amount Usd Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CLIENT_ADDRESS",
+    "label": "Client Address",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CLIENT_LEGAL_NAME",
+    "label": "Client Legal Name",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CLIENT_REGISTRY_NUMBER",
+    "label": "Client Registry Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CLIENT_REPRESENTATIVE_ID_NUMBER",
+    "label": "Client Representative Id Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CLIENT_REPRESENTATIVE_NAME",
+    "label": "Client Representative Name",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CLIENT_TAX_ID",
+    "label": "Client Tax Id",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COLLABORATION_COMMISSION_PERCENT_NUMBER",
+    "label": "Collaboration Commission Percent Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COLLABORATION_COMMISSION_PERCENT_WORDS",
+    "label": "Collaboration Commission Percent Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COLLABORATION_CONTENT_DESCRIPTION",
+    "label": "Collaboration Content Description",
+    "type": "text",
+    "source": "USER_INPUT",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COLLABORATION_CONTENT_FORMAT",
+    "label": "Collaboration Content Format",
+    "type": "text",
+    "source": "USER_INPUT",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COLLABORATION_PURPOSE",
+    "label": "Collaboration Purpose",
+    "type": "text",
+    "source": "USER_INPUT",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COLLABORATOR_PROFILE_DESCRIPTION",
+    "label": "Collaborator Profile Description",
+    "type": "text",
+    "source": "USER_INPUT",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COMMISSION_PERCENT_NUMBER",
+    "label": "Commission Percent Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COMMISSION_PERCENT_WORDS",
+    "label": "Commission Percent Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COMPENSATION_THRESHOLD_DAYS_NUMBER",
+    "label": "Compensation Threshold Days Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COMPENSATION_THRESHOLD_DAYS_WORDS",
+    "label": "Compensation Threshold Days Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CONFIDENTIALITY_DURATION_YEARS_NUMBER",
+    "label": "Confidentiality Duration Years Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CONFIDENTIALITY_DURATION_YEARS_WORDS",
+    "label": "Confidentiality Duration Years Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CONTRACT_DURATION_YEARS_NUMBER",
+    "label": "Contract Duration Years Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "CONTRACT_DURATION_YEARS_WORDS",
+    "label": "Contract Duration Years Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_ADDRESS",
+    "label": "Counterparty Address",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_ID_NUMBER",
+    "label": "Counterparty Id Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_JURISDICTION",
+    "label": "Counterparty Jurisdiction",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_LEGAL_NAME",
+    "label": "Counterparty Legal Name",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_NAME",
+    "label": "Counterparty Name",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_REGISTRY_NUMBER",
+    "label": "Counterparty Registry Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_REPRESENTATIVE_ADDRESS",
+    "label": "Counterparty Representative Address",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_REPRESENTATIVE_CIVIL_STATUS",
+    "label": "Counterparty Representative Civil Status",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_REPRESENTATIVE_ID_NUMBER",
+    "label": "Counterparty Representative Id Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_REPRESENTATIVE_NAME",
+    "label": "Counterparty Representative Name",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_REPRESENTATIVE_NATIONALITY",
+    "label": "Counterparty Representative Nationality",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_REPRESENTATIVE_PASSPORT_NUMBER",
+    "label": "Counterparty Representative Passport Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_REPRESENTATIVE_TITLE",
+    "label": "Counterparty Representative Title",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_SIGNER_NAME",
+    "label": "Counterparty Signer Name",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "COUNTERPARTY_TAX_ID",
+    "label": "Counterparty Tax Id",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "DEFAULT_PAYMENT_TERM_DAYS_NUMBER",
+    "label": "Default Payment Term Days Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "DEFAULT_PAYMENT_TERM_DAYS_WORDS",
+    "label": "Default Payment Term Days Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "DIGITAL_DISCOUNT_PERCENT_NUMBER",
+    "label": "Digital Discount Percent Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "DIGITAL_DISCOUNT_PERCENT_WORDS",
+    "label": "Digital Discount Percent Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "END_DAY_NUMBER",
+    "label": "End Day Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "END_DAY_WORDS",
+    "label": "End Day Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "END_MONTH",
+    "label": "End Month",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "END_YEAR_NUMBER",
+    "label": "End Year Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "END_YEAR_WORDS",
+    "label": "End Year Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "EXCHANGE_AIR_TICKETS_NUMBER",
+    "label": "Exchange Air Tickets Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "EXCHANGE_AIR_TICKETS_WORDS",
+    "label": "Exchange Air Tickets Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "EXCHANGE_LODGING_STAYS_NUMBER",
+    "label": "Exchange Lodging Stays Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "EXCHANGE_LODGING_STAYS_WORDS",
+    "label": "Exchange Lodging Stays Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "EXCHANGE_RATE_DOP_PER_USD",
+    "label": "Exchange Rate Dop Per Usd",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "GDL_SIGNER_1_ID_NUMBER",
+    "label": "Gdl Signer 1 Id Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "GDL_SIGNER_1_NAME",
+    "label": "Gdl Signer 1 Name",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "GDL_SIGNER_2_ID_NUMBER",
+    "label": "Gdl Signer 2 Id Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "GDL_SIGNER_2_NAME",
+    "label": "Gdl Signer 2 Name",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INTERMEDIARY_ADDRESS",
+    "label": "Intermediary Address",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INTERMEDIARY_JURISDICTION",
+    "label": "Intermediary Jurisdiction",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INTERMEDIARY_LEGAL_NAME",
+    "label": "Intermediary Legal Name",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INTERMEDIARY_REGISTRY_NUMBER",
+    "label": "Intermediary Registry Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INTERMEDIARY_SIGNER_NAME",
+    "label": "Intermediary Signer Name",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INTERMEDIARY_SIGNER_TITLE",
+    "label": "Intermediary Signer Title",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INTERMEDIARY_TAX_ID",
+    "label": "Intermediary Tax Id",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INVOICE_DEADLINE_DAY_NUMBER",
+    "label": "Invoice Deadline Day Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "INVOICE_DEADLINE_DAY_WORDS",
+    "label": "Invoice Deadline Day Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "MIN_AVERAGE_MONTHLY_INVESTMENT_AMOUNT",
+    "label": "Min Average Monthly Investment Amount",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "MIN_AVERAGE_MONTHLY_INVESTMENT_CURRENCY",
+    "label": "Min Average Monthly Investment Currency",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "MIN_AVERAGE_MONTHLY_INVESTMENT_PERIOD_MONTHS_NUMBER",
+    "label": "Min Average Monthly Investment Period Months Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "MIN_AVERAGE_MONTHLY_INVESTMENT_PERIOD_MONTHS_WORDS",
+    "label": "Min Average Monthly Investment Period Months Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "MIN_AVERAGE_MONTHLY_INVESTMENT_WORDS",
+    "label": "Min Average Monthly Investment Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "OWN_ADVERTISING_DISCOUNT_PERCENT_NUMBER",
+    "label": "Own Advertising Discount Percent Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "OWN_ADVERTISING_DISCOUNT_PERCENT_WORDS",
+    "label": "Own Advertising Discount Percent Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PERIOD_END_DAY_NUMBER",
+    "label": "Period End Day Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PERIOD_END_DAY_WORDS",
+    "label": "Period End Day Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PERIOD_END_MONTH",
+    "label": "Period End Month",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PERIOD_START_DAY_NUMBER",
+    "label": "Period Start Day Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PERIOD_START_DAY_WORDS",
+    "label": "Period Start Day Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PERIOD_START_MONTH",
+    "label": "Period Start Month",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PERIOD_YEAR_NUMBER",
+    "label": "Period Year Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PERIOD_YEAR_WORDS",
+    "label": "Period Year Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PREVENTA_YEAR",
+    "label": "Preventa Year",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PUBLICITY_CREDIT_AMOUNT",
+    "label": "Publicity Credit Amount",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PUBLICITY_CREDIT_AMOUNT_CENTS",
+    "label": "Publicity Credit Amount Cents",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PUBLICITY_CREDIT_AMOUNT_WORDS",
+    "label": "Publicity Credit Amount Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PUBLICITY_INVESTMENT_AMOUNT",
+    "label": "Publicity Investment Amount",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "PUBLICITY_INVESTMENT_AMOUNT_WORDS",
+    "label": "Publicity Investment Amount Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "RELATED_COMPANIES_LIST",
+    "label": "Related Companies List",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "REQUEST_NUMBER",
+    "label": "Request Number",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "SALES_SUPPORT_EMAIL",
+    "label": "Sales Support Email",
+    "type": "email",
+    "source": "USER_INPUT",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "SIGNING_DAY_NUMBER",
+    "label": "Signing Day Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED",
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "SIGNING_DAY_WORDS",
+    "label": "Signing Day Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED",
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "SIGNING_MONTH",
+    "label": "Signing Month",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED",
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "SIGNING_YEAR_NUMBER",
+    "label": "Signing Year Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED",
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "SIGNING_YEAR_WORDS",
+    "label": "Signing Year Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED",
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED",
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "START_DAY_NUMBER",
+    "label": "Start Day Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "START_DAY_WORDS",
+    "label": "Start Day Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "START_MONTH",
+    "label": "Start Month",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "START_YEAR_NUMBER",
+    "label": "Start Year Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "START_YEAR_WORDS",
+    "label": "Start Year Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED",
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "TOTAL_PUBLICITY_AMOUNT_DOP",
+    "label": "Total Publicity Amount Dop",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "TOTAL_PUBLICITY_AMOUNT_DOP_WORDS",
+    "label": "Total Publicity Amount Dop Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "TOTAL_PUBLICITY_AMOUNT_USD",
+    "label": "Total Publicity Amount Usd",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "TOTAL_PUBLICITY_AMOUNT_USD_WORDS",
+    "label": "Total Publicity Amount Usd Words",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "UPGRADED_COMMISSION_PERCENT_NUMBER",
+    "label": "Upgraded Commission Percent Number",
+    "type": "number",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  },
+  {
+    "name": "UPGRADED_COMMISSION_PERCENT_WORDS",
+    "label": "Upgraded Commission Percent Words",
+    "type": "text",
+    "source": "SAP_VARIABLE",
+    "required": true,
+    "templates": [
+      "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED"
+    ]
+  }
+]
