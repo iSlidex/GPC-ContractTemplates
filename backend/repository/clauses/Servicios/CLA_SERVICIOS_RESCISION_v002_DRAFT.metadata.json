@@ -1,0 +1,20 @@
+{
+  "title": "Cláusula de Rescisión",
+  "class": "CLAUSE",
+  "type": "STANDARD",
+  "categories": [
+    "SERVICIOS"
+  ],
+  "governingLaw": "DO",
+  "language": "es",
+  "description": "Text block Cláusula de Rescisión",
+  "validFrom": "",
+  "validTo": "",
+  "owner": "GPC Legal",
+  "version": "v002",
+  "revision": 2,
+  "status": "DRAFT",
+  "variantsOf": null,
+  "createdFrom": "CLA_SERVICIOS_RESCISION_v001_APROBADO",
+  "updatedAt": "2026-06-17T20:30:31.528Z"
+}
