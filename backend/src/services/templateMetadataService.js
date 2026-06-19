@@ -7,6 +7,7 @@ const {
   getTemplateStatusState,
   normalizeTemplateStatus
 } = require("./templateLifecycle");
+const { getTemplateDefinition } = require("../domain/contractTemplateDomain");
 
 const REPO_ROOT = path.resolve(__dirname, "../../repository");
 const TEMPLATES_ROOT = path.join(REPO_ROOT, "templates");
@@ -137,6 +138,7 @@ function contentTypeFromExtension(extension) {
 }
 
 function enrichTemplateMetadata(template, sidecarMetadata = readSidecarMetadata(template)) {
+  const domainDefinition = getTemplateDefinition(template.templateId);
   const status = normalizeTemplateStatus(sidecarMetadata.status || template.status);
   const categories = sidecarMetadata.categories || [template.category];
 
@@ -152,7 +154,11 @@ function enrichTemplateMetadata(template, sidecarMetadata = readSidecarMetadata(
     language: sidecarMetadata.language || "es",
     description:
       sidecarMetadata.description ||
+      (domainDefinition && domainDefinition.businessDescription) ||
       `Plantilla ${template.contractType} ${template.version}`,
+    context: sidecarMetadata.context || (domainDefinition && domainDefinition.context) || "",
+    requiredVariables: sidecarMetadata.requiredVariables || (domainDefinition && domainDefinition.requiredVariables) || [],
+    businessDescription: sidecarMetadata.businessDescription || (domainDefinition && domainDefinition.businessDescription) || "",
     validFrom: sidecarMetadata.validFrom || "",
     validTo: sidecarMetadata.validTo || "",
     owner: sidecarMetadata.owner || "GPC Legal",

@@ -11,6 +11,7 @@ const {
 const {
   buildVirtualDocumentMetadata
 } = require("./virtualDocumentService");
+const { classifyCatalogVariable } = require("../domain/variableCatalog");
 
 const REPO_ROOT = path.resolve(__dirname, "../../repository");
 
@@ -115,7 +116,7 @@ function inferVariableType(variableName) {
   return "text";
 }
 
-const SAP_VARIABLES = new Set([
+const LEGACY_SAP_VARIABLES = new Set([
   "CONTRACT_NUMBER",
   "CONTRACTOR_NAME",
   "CONTRACTOR_ID",
@@ -129,7 +130,13 @@ const SAP_VARIABLES = new Set([
 ]);
 
 function classifyVariable(variableName) {
-  if (SAP_VARIABLES.has(variableName)) {
+  const catalogClassification = classifyCatalogVariable(variableName);
+
+  if (catalogClassification) {
+    return catalogClassification;
+  }
+
+  if (LEGACY_SAP_VARIABLES.has(variableName)) {
     return {
       source: "SAP_VARIABLE",
       ecaType: "VARIABLE"
@@ -292,7 +299,7 @@ function generatePdfFromRenderedContent({ template, contractNumber, renderedCont
   const outputDir = path.join(REPO_ROOT, "generated", "pdf", category);
   ensureDir(outputDir);
 
-  const outputFileName = `CTR_${contractNumber}_${category}_${contractType}_${version}_PARA_FIRMA.pdf`;
+  const outputFileName = `CTR_${contractNumber}_${category}_${contractType}_${version}_REPORTE_VARIABLES.pdf`;
   const outputPath = path.join(outputDir, outputFileName);
 
   const doc = new PDFDocument({
@@ -303,7 +310,7 @@ function generatePdfFromRenderedContent({ template, contractNumber, renderedCont
   const stream = fs.createWriteStream(outputPath);
   doc.pipe(stream);
 
-  doc.fontSize(16).text("CONTRATO GENERADO PARA FIRMA", {
+  doc.fontSize(16).text("REPORTE DE VARIABLES DEL DOCUMENTO", {
     align: "center"
   });
 
@@ -322,7 +329,7 @@ function generatePdfFromRenderedContent({ template, contractNumber, renderedCont
       lineGap: 4
     });
   } else {
-    doc.font("Helvetica-Bold").text("Datos usados para generar el documento:");
+    doc.font("Helvetica-Bold").text("Variables usadas para generar el documento DOCX:");
     doc.font("Helvetica");
 
     Object.entries(values).forEach(([key, value]) => {
@@ -418,7 +425,11 @@ async function generateContractDocuments({ templateId, contractNumber, values })
     }),
     files: {
       document: generatedDocument,
-      pdf
+      pdf: {
+        ...pdf,
+        documentRole: "VARIABLE_REPORT",
+        label: "Reporte de variables del documento"
+      }
     }
   };
 

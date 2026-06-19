@@ -64,25 +64,35 @@ function buildVirtualDocumentMetadata({
 }
 
 async function refreshVirtualDocument({ template, variables, contractNumber, values }) {
-  const sapResult = await getContractData(contractNumber);
+  const sapResult = await getContractData(contractNumber, { templateId: template.templateId });
   const refreshedValues = {
     ...(values || {}),
     ...(sapResult.values || {})
   };
 
+  const metadata = buildVirtualDocumentMetadata({
+    contractNumber,
+    template,
+    variables,
+    values: refreshedValues,
+    refreshed: true
+  });
+  const refreshedSapVariables = variables
+    .filter((variable) => variable.source === "SAP_VARIABLE" && refreshedValues[variable.name])
+    .map((variable) => variable.name);
+  const pendingVariables = variables
+    .filter((variable) => variable.required && !refreshedValues[variable.name])
+    .map((variable) => variable.name);
+
   return {
-    message: "Variables SAP refrescadas. No se regeneraron DOCX/PDF en esta iteración.",
+    message: `Refresh completado: ${refreshedSapVariables.length} variables SAP/mock actualizadas. Pendientes: ${pendingVariables.length ? pendingVariables.join(", ") : "ninguna"}. Este refresh no regenera automáticamente el DOCX ni el PDF; usa Generar documento/PDF para crear o regenerar los archivos.`,
+    refreshedVariables: refreshedSapVariables,
+    pendingVariables,
     source: sapResult.source,
     fallback: sapResult.fallback,
     reason: sapResult.reason || null,
     values: refreshedValues,
-    virtualDocument: buildVirtualDocumentMetadata({
-      contractNumber,
-      template,
-      variables,
-      values: refreshedValues,
-      refreshed: true
-    })
+    virtualDocument: metadata
   };
 }
 

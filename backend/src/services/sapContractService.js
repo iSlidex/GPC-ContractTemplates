@@ -1,4 +1,5 @@
 const { executeHttpRequest } = require("@sap-cloud-sdk/http-client");
+const { getSapVariableNames } = require("../domain/variableCatalog");
 
 function normalizeDate(value) {
   if (!value) {
@@ -146,6 +147,62 @@ function extractODataXmlEntity(xml) {
   return entity;
 }
 
+function defaultValueForVariable(name, rawContract, requestedContractId) {
+  const direct = pick(rawContract, [name], "");
+  if (direct) return String(direct);
+
+  const defaults = {
+    REQUEST_NUMBER: requestedContractId,
+    CONTRACT_NUMBER: requestedContractId,
+    CONTRACT_CURRENCY: "USD",
+    CURRENCY: "USD",
+    SIGNING_MONTH: "junio",
+    SIGNING_DAY_NUMBER: "18",
+    SIGNING_DAY_WORDS: "dieciocho",
+    SIGNING_YEAR_NUMBER: "2026",
+    SIGNING_YEAR_WORDS: "dos mil veintiséis",
+    START_DAY_NUMBER: "1",
+    START_DAY_WORDS: "uno",
+    START_MONTH: "julio",
+    START_YEAR_NUMBER: "2026",
+    START_YEAR_WORDS: "dos mil veintiséis",
+    END_DAY_NUMBER: "31",
+    END_DAY_WORDS: "treinta y uno",
+    END_MONTH: "diciembre",
+    END_YEAR_NUMBER: "2026",
+    END_YEAR_WORDS: "dos mil veintiséis",
+    PERIOD_START_DAY_NUMBER: "1",
+    PERIOD_START_DAY_WORDS: "uno",
+    PERIOD_START_MONTH: "enero",
+    PERIOD_END_DAY_NUMBER: "31",
+    PERIOD_END_DAY_WORDS: "treinta y uno",
+    PERIOD_END_MONTH: "diciembre",
+    PERIOD_YEAR_NUMBER: "2026",
+    PERIOD_YEAR_WORDS: "dos mil veintiséis",
+    PREVENTA_YEAR: "2026"
+  };
+
+  if (defaults[name]) return defaults[name];
+  if (name.endsWith("_WORDS")) return "valor en letras provisto por mock";
+  if (name.includes("PERCENT")) return "10";
+  if (name.includes("DAYS_NUMBER")) return "30";
+  if (name.includes("YEARS_NUMBER")) return "1";
+  if (name.includes("MONTHS_NUMBER")) return "12";
+  if (name.includes("AMOUNT") || name.includes("RATE") || name.includes("TICKETS_NUMBER") || name.includes("STAYS_NUMBER")) return "1000";
+  if (name.includes("EMAIL")) return "legal.demo@gpc.example";
+  if (name.includes("TAX_ID")) return "RNC-101000001";
+  if (name.includes("REGISTRY_NUMBER")) return "RM-000001";
+  if (name.includes("ID_NUMBER") || name.includes("PASSPORT_NUMBER")) return "001-0000000-1";
+  if (name.includes("ADDRESS")) return "Boulevard Turístico del Este, Punta Cana, República Dominicana";
+  if (name.includes("JURISDICTION")) return "República Dominicana";
+  if (name.includes("TITLE")) return "Representante legal";
+  if (name.includes("LEGAL_NAME") || name.includes("NAME")) return "Entidad demo GDL, S.R.L.";
+  if (name.includes("RELATED_COMPANIES_LIST")) return "Grupo Punta Cana, S.A.; Inversiones Turísticas GPC, S.R.L.";
+  if (name.includes("PUBLICITY") || name.includes("ADVERTISING")) return "Campaña publicitaria institucional GDL";
+
+  return `Valor mock ${name}`;
+}
+
 function mapSapContractToTemplateValues(rawContract, requestedContractId) {
   const contractNumber = pick(rawContract, [
     "ContractNumber",
@@ -249,7 +306,7 @@ function mapSapContractToTemplateValues(rawContract, requestedContractId) {
     "END_DATE"
   ], "");
 
-  return {
+  const mappedValues = {
     CONTRACT_NUMBER: String(contractNumber || requestedContractId || ""),
     CONTRACTOR_NAME: String(contractorName || ""),
     CONTRACTOR_ID: String(contractorId || ""),
@@ -261,10 +318,36 @@ function mapSapContractToTemplateValues(rawContract, requestedContractId) {
     START_DATE: normalizeDate(startDate),
     END_DATE: normalizeDate(endDate)
   };
+
+  getSapVariableNames().forEach((name) => {
+    mappedValues[name] = String(mappedValues[name] || defaultValueForVariable(name, rawContract, requestedContractId));
+  });
+
+  Object.entries(rawContract || {}).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== "") {
+      mappedValues[key] = String(value);
+    }
+  });
+
+  return mappedValues;
 }
 
-function getMockContract(contractId) {
-  const samples = [
+function getMockContract(contractId, templateId) {
+  const gdlSamples = [
+    { TemplateId: "TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED", ContractNumber: contractId, CounterpartyName: "Influencer Caribe Creativo", CollaborationPurpose: "Colaboración de contenidos para promoción turística" },
+    { TemplateId: "TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED", ContractNumber: contractId, IntermediaryLegalName: "Agencia Actual GDL, S.R.L.", ClientLegalName: "Grupo Punta Cana, S.A." },
+    { TemplateId: "TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED", ContractNumber: contractId, IntermediaryLegalName: "Nueva Agencia GDL, S.R.L.", ClientLegalName: "Grupo Punta Cana, S.A." },
+    { TemplateId: "TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED", ContractNumber: contractId, CounterpartyLegalName: "Medios del Caribe, S.A.", PublicityCreditAmount: "5000" },
+    { TemplateId: "TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED", ContractNumber: contractId, CounterpartyLegalName: "Canal Preventa GDL, S.R.L.", PreventaYear: "2026" },
+    { TemplateId: "TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED", ContractNumber: contractId, CounterpartyLegalName: "Medios Integrados GDL, S.R.L.", BillableAmountUsd: "15000" }
+  ];
+
+  if (templateId) {
+    const templateSample = gdlSamples.find((sample) => sample.TemplateId === templateId);
+    if (templateSample) return templateSample;
+  }
+
+  const samples = gdlSamples.concat([
     {
       ContractNumber: contractId,
       ContractorName: "Servicios Técnicos del Caribe, S.R.L.",
@@ -301,7 +384,7 @@ function getMockContract(contractId) {
       StartDate: "20260901",
       EndDate: "20270301"
     }
-  ];
+  ]);
 
   const index = Math.abs(String(contractId).split("").reduce((acc, char) => {
     return acc + char.charCodeAt(0);
@@ -582,7 +665,7 @@ async function getContractData(contractId, options = {}) {
   }
 
   if (forceMock) {
-    const rawMock = getMockContract(contractId);
+    const rawMock = getMockContract(contractId, options.templateId);
 
     return {
       contractId,
@@ -608,7 +691,7 @@ async function getContractData(contractId, options = {}) {
       values: mapSapContractToTemplateValues(rawContract, contractId)
     };
   } catch (error) {
-    const rawMock = getMockContract(contractId);
+    const rawMock = getMockContract(contractId, options.templateId);
 
     return {
       contractId,

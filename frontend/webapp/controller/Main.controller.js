@@ -1422,7 +1422,7 @@ sap.ui.define([
             });
 
             const oDialog = new Dialog({
-                title: "Vista previa PDF - " + oItem.name,
+                title: "Vista previa reporte PDF - " + oItem.name,
                 contentWidth: "90%",
                 contentHeight: "80%",
                 resizable: true,
@@ -2326,7 +2326,7 @@ sap.ui.define([
                 draggable: true,
                 content: [oDialogContent],
                 beginButton: new Button({
-                    text: "Generar documento/PDF",
+                    text: "Generar DOCX y reporte PDF",
                     type: "Emphasized",
                     icon: "sap-icon://documents",
                     press: async function () {
@@ -2677,7 +2677,7 @@ sap.ui.define([
             oModel.setProperty("/lastGeneration", {
                 docxText: "Descargar documento generado: " + sDocumentFileName,
                 docxUrl: sApiBaseUrl + oResult.downloadUrls.docx,
-                pdfText: "Descargar PDF para firma",
+                pdfText: "Descargar reporte PDF de variables",
                 pdfUrl: sApiBaseUrl + oResult.downloadUrls.pdf,
                 metadataText: "Descargar metadata JSON",
                 metadataUrl: sApiBaseUrl + oResult.downloadUrls.metadata
@@ -2742,7 +2742,7 @@ sap.ui.define([
                             }),
 
                             new Link({
-                                text: "Abrir PDF para firma",
+                                text: "Abrir reporte PDF de variables",
                                 href: sApiBaseUrl + oResult.downloadUrls.pdf,
                                 target: "_blank"
                             }),
@@ -2820,7 +2820,7 @@ sap.ui.define([
                 MessageToast.show("Variables SAP/mock refrescadas");
                 MessageBox.information(
                     (oResult.message || "Variables SAP/mock refrescadas") +
-                    "\n\nAviso: el refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX/PDF."
+                    "\n\nAviso: el refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX ni el reporte PDF."
                 );
             } catch (oError) {
                 oDialog.setBusy(false);
