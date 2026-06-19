@@ -396,3 +396,37 @@ Respuesta resumida:
   "offset": 0
 }
 ```
+
+## Plantillas GDL integradas al dominio funcional
+
+El MVP integra las siguientes plantillas DOCX GDL ubicadas en `backend/repository/templates/` con sidecars `.metadata.json` adyacentes y definiciones funcionales en `docs/contracts/`:
+
+- `TPL_CC_AcuerdoColaboracionGDL_v001_APPROVED`
+- `TPL_IP_IntermediacionPublicitariaAgenciasActuales_v001_APPROVED`
+- `TPL_IP_IntermediacionPublicitariaNuevasAgencias_v001_APPROVED`
+- `TPL_IP_AcuerdoIntercambioPublicidad_v001_APPROVED`
+- `TPL_IP_AcuerdoInversionPublicidadPreventa_v001_APPROVED`
+- `TPL_IP_AcuerdoInversionPublicidadGeneral_v001_APPROVED`
+
+La sintaxis soportada para placeholders es `{VARIABLE_NAME}`. El backend conserva la extracción compatible con Docxtemplater y clasifica las variables usando `docs/contracts/variables_catalog.json`: las variables con fuente SAP/mock se exponen como `SAP_VARIABLE`, y las demás como `USER_INPUT` para **Campos de usuario**.
+
+### Fuentes de dominio runtime
+
+- `docs/contracts/template_manifest.json`: manifiesto de plantillas GDL y compatibilidad de placeholders.
+- `docs/contracts/variables_catalog.json`: catálogo de variables, tipo, obligatoriedad, fuente y plantillas asociadas.
+- `backend/src/domain/contractTemplateDomain.js`: definiciones runtime por plantilla (`templateId`, categoría, tipo, contexto, estado, versión, variables requeridas y descripción de negocio).
+- `backend/src/domain/variableCatalog.js`: acceso runtime al catálogo para clasificar variables y extender el mapeo SAP/mock sin depender de un set fijo.
+
+### Flujo de Ensamblaje con refresh
+
+1. Selecciona una plantilla en **Ensamblaje**.
+2. Consulta o confirma el número de contrato/solicitud.
+3. Usa **Refrescar variables SAP/mock** para actualizar valores y metadata del **Documento virtual**.
+4. Revisa **Variables SAP** y **Campos de usuario**. Si no hay campos manuales, la pestaña muestra un empty state explicando que no hay entradas de usuario pendientes para la plantilla seleccionada.
+5. Usa **Generar DOCX y reporte PDF** para crear o regenerar archivos.
+
+El refresh de `POST /api/virtual-documents/refresh` actualiza valores SAP/mock y recalcula estado/mensajes, pero no regenera automáticamente el DOCX ni el PDF. Para crear o reemplazar archivos descargables hay que ejecutar la acción de generación.
+
+### DOCX de contrato vs PDF de reporte
+
+Para mantener estabilidad en el MVP, el DOCX generado es el contrato renderizado por Docxtemplater. El PDF generado queda etiquetado como **Reporte de variables del documento** y su nombre usa el sufijo `_REPORTE_VARIABLES.pdf`; no debe presentarse como contrato PDF final para firma. La conversión real de contrato DOCX a PDF queda documentada como una mejora futura.
