@@ -226,9 +226,10 @@
                                 <Panel id="generationPanel" headerText="Última generación" expandable="false" class="gpcEcmCard sapUiSmallMarginTop">
                                     <content>
                                         <VBox id="generationResultBox" visible="{app>/hasGenerationResult}">
-                                            <ObjectStatus id="generationStatus" text="{app>/generationMessage}" state="Success" class="sapUiSmallMarginBottom" />
+                                            <ObjectStatus id="generationStatus" text="{app>/generationMessage}" state="{= ${app>/lastGeneration/pdfAvailable} ? 'Success' : 'Warning' }" class="sapUiSmallMarginBottom" />
                                             <Link id="downloadDocxLink" text="{app>/lastGeneration/docxText}" href="{app>/lastGeneration/docxUrl}" target="_blank" />
-                                            <Link id="downloadPdfLink" text="{app>/lastGeneration/pdfText}" href="{app>/lastGeneration/pdfUrl}" target="_blank" />
+                                            <Link id="downloadPdfLink" text="{app>/lastGeneration/pdfText}" href="{app>/lastGeneration/pdfUrl}" target="_blank" visible="{app>/lastGeneration/pdfAvailable}" />
+                                            <ObjectStatus id="pdfUnavailableStatus" text="{app>/lastGeneration/pdfUnavailableMessage}" state="Warning" visible="{= ${app>/hasGenerationResult} &amp;&amp; !${app>/lastGeneration/pdfAvailable} }" />
                                             <Link id="downloadMetadataLink" text="{app>/lastGeneration/metadataText}" href="{app>/lastGeneration/metadataUrl}" target="_blank" />
                                         </VBox>
                                         <Text id="noGenerationText" visible="{= !${app>/hasGenerationResult} }" text="Aún no hay documento virtual activo. Crea un documento desde una plantilla para iniciar el ensamblaje." />

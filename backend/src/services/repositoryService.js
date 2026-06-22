@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const Docxtemplater = require("docxtemplater");
 const PizZip = require("pizzip");
-const PDFDocument = require("pdfkit");
 const {
   getTemplates,
   getTemplateById,
@@ -12,6 +11,7 @@ const {
   buildVirtualDocumentMetadata
 } = require("./virtualDocumentService");
 const { classifyCatalogVariable } = require("../domain/variableCatalog");
+const { convertDocxToPdf } = require("./pdfConversionService");
 
 const REPO_ROOT = path.resolve(__dirname, "../../repository");
 
@@ -291,77 +291,17 @@ function renderHtmlFromTemplate({ template, templatePath, contractNumber, values
   };
 }
 
-function generatePdfFromRenderedContent({ template, contractNumber, renderedContent, values }) {
-  const category = template.category;
-  const contractType = template.contractType;
-  const version = template.version;
+function buildPdfFileName({ template, contractNumber }) {
+  return `CTR_${contractNumber}_${template.category}_${template.contractType}_${template.version}_PARA_FIRMA.pdf`;
+}
 
-  const outputDir = path.join(REPO_ROOT, "generated", "pdf", category);
-  ensureDir(outputDir);
-
-  const outputFileName = `CTR_${contractNumber}_${category}_${contractType}_${version}_REPORTE_VARIABLES.pdf`;
-  const outputPath = path.join(outputDir, outputFileName);
-
-  const doc = new PDFDocument({
-    size: "LETTER",
-    margin: 72
-  });
-
-  const stream = fs.createWriteStream(outputPath);
-  doc.pipe(stream);
-
-  doc.fontSize(16).text("REPORTE DE VARIABLES DEL DOCUMENTO", {
-    align: "center"
-  });
-
-  doc.moveDown(2);
-
-  doc.fontSize(10).text(`Número de contrato: ${contractNumber}`);
-  doc.text(`Tipo de contrato: ${contractType}`);
-  doc.text(`Categoría: ${category}`);
-  doc.text(`Versión de plantilla: ${version}`);
-
-  doc.moveDown();
-
-  if (renderedContent) {
-    doc.fontSize(11).text(stripHtml(renderedContent), {
-      align: "justify",
-      lineGap: 4
-    });
-  } else {
-    doc.font("Helvetica-Bold").text("Variables usadas para generar el documento DOCX:");
-    doc.font("Helvetica");
-
-    Object.entries(values).forEach(([key, value]) => {
-      doc.moveDown(0.5);
-      doc.text(`${key}: ${value || ""}`);
-    });
-  }
-
-  doc.moveDown(4);
-
-  doc.text("______________________________");
-  doc.text("EL CONTRATISTA");
-
-  doc.moveDown(2);
-
-  doc.text("______________________________");
-  doc.text("LA EMPRESA");
-
-  doc.end();
-
-  return new Promise((resolve, reject) => {
-    stream.on("finish", () => {
-      resolve({
-        fileName: outputFileName,
-        absolutePath: outputPath,
-        relativePath: path.relative(REPO_ROOT, outputPath),
-        extension: ".pdf"
-      });
-    });
-
-    stream.on("error", reject);
-  });
+function buildPdfUnavailableMetadata(error) {
+  return {
+    available: false,
+    status: error.code || "PDF_CONVERSION_FAILED",
+    message: "El DOCX fue generado correctamente, pero no se pudo convertir a PDF. Configure LibreOffice/headless converter para generar el documento final de firma.",
+    technicalDetail: error.details || error.message
+  };
 }
 
 async function generateContractDocuments({ templateId, contractNumber, values }) {
@@ -376,7 +316,8 @@ async function generateContractDocuments({ templateId, contractNumber, values })
   });
 
   let generatedDocument;
-  let renderedContent = "";
+  let pdf = null;
+  let pdfConversion = null;
 
   if (template.extension === ".docx") {
     generatedDocument = renderDocxFromTemplate({
@@ -386,7 +327,31 @@ async function generateContractDocuments({ templateId, contractNumber, values })
       values: normalizedValues
     });
 
-    renderedContent = null;
+    const pdfOutputDir = path.join(REPO_ROOT, "generated", "pdf", template.category);
+    const pdfOutputFileName = buildPdfFileName({ template, contractNumber });
+
+    try {
+      const convertedPdf = await convertDocxToPdf({
+        docxPath: generatedDocument.absolutePath,
+        outputDir: pdfOutputDir,
+        outputFileName: pdfOutputFileName
+      });
+
+      pdf = {
+        ...convertedPdf,
+        relativePath: path.relative(REPO_ROOT, convertedPdf.absolutePath),
+        documentRole: "SIGNATURE_FINAL",
+        label: "Contrato final para firma",
+        available: true
+      };
+      pdfConversion = {
+        available: true,
+        status: "COMPLETED",
+        converter: convertedPdf.converter
+      };
+    } catch (error) {
+      pdfConversion = buildPdfUnavailableMetadata(error);
+    }
   } else if (template.extension === ".html") {
     generatedDocument = renderHtmlFromTemplate({
       template,
@@ -395,20 +360,17 @@ async function generateContractDocuments({ templateId, contractNumber, values })
       values: normalizedValues
     });
 
-    renderedContent = generatedDocument.renderedHtml;
     delete generatedDocument.renderedHtml;
+    pdfConversion = {
+      available: false,
+      status: "PDF_CONVERSION_UNAVAILABLE",
+      message: "El PDF final para firma solo se genera desde el DOCX renderizado. Use una plantilla DOCX o configure un conversor equivalente para este formato."
+    };
   } else {
     const error = new Error("Tipo de plantilla no soportado para generación");
     error.statusCode = 400;
     throw error;
   }
-
-  const pdf = await generatePdfFromRenderedContent({
-    template,
-    contractNumber,
-    renderedContent,
-    values: normalizedValues
-  });
 
   const metadata = {
     contractNumber,
@@ -423,13 +385,10 @@ async function generateContractDocuments({ templateId, contractNumber, values })
       variables: variablesInfo.variables,
       values: normalizedValues
     }),
+    pdfConversion,
     files: {
       document: generatedDocument,
-      pdf: {
-        ...pdf,
-        documentRole: "VARIABLE_REPORT",
-        label: "Reporte de variables del documento"
-      }
+      pdf
     }
   };
 

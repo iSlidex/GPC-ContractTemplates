@@ -237,14 +237,21 @@ router.post("/templates/:templateId/generate", async (req, res, next) => {
       values
     });
 
+    const downloadUrls = {
+      docx: `/api/files/download?path=${encodeURIComponent(result.docx.relativePath)}`,
+      metadata: `/api/files/download?path=${encodeURIComponent(result.metadataFile.relativePath)}`
+    };
+
+    if (result.pdf && result.pdf.relativePath) {
+      downloadUrls.pdf = `/api/files/download?path=${encodeURIComponent(result.pdf.relativePath)}`;
+    }
+
     res.json({
-      message: "Documentos generados correctamente",
+      message: result.pdf
+        ? "Documentos generados correctamente"
+        : "DOCX generado correctamente; PDF final no disponible",
       result,
-      downloadUrls: {
-        docx: `/api/files/download?path=${encodeURIComponent(result.docx.relativePath)}`,
-        pdf: `/api/files/download?path=${encodeURIComponent(result.pdf.relativePath)}`,
-        metadata: `/api/files/download?path=${encodeURIComponent(result.metadataFile.relativePath)}`
-      }
+      downloadUrls
     });
   } catch (error) {
     next(error);

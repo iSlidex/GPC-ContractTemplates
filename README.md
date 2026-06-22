@@ -423,10 +423,14 @@ La sintaxis soportada para placeholders es `{VARIABLE_NAME}`. El backend conserv
 2. Consulta o confirma el número de contrato/solicitud.
 3. Usa **Refrescar variables SAP/mock** para actualizar valores y metadata del **Documento virtual**.
 4. Revisa **Variables SAP** y **Campos de usuario**. Si no hay campos manuales, la pestaña muestra un empty state explicando que no hay entradas de usuario pendientes para la plantilla seleccionada.
-5. Usa **Generar DOCX y reporte PDF** para crear o regenerar archivos.
+5. Usa **Generar DOCX y PDF final** para crear o regenerar el contrato editable y, si hay conversor disponible, el PDF final para firma.
 
 El refresh de `POST /api/virtual-documents/refresh` actualiza valores SAP/mock y recalcula estado/mensajes, pero no regenera automáticamente el DOCX ni el PDF. Para crear o reemplazar archivos descargables hay que ejecutar la acción de generación.
 
-### DOCX de contrato vs PDF de reporte
+### DOCX editable y PDF final para firma
 
-Para mantener estabilidad en el MVP, el DOCX generado es el contrato renderizado por Docxtemplater. El PDF generado queda etiquetado como **Reporte de variables del documento** y su nombre usa el sufijo `_REPORTE_VARIABLES.pdf`; no debe presentarse como contrato PDF final para firma. La conversión real de contrato DOCX a PDF queda documentada como una mejora futura.
+El DOCX generado es el contrato editable renderizado por Docxtemplater desde la plantilla DOCX. El PDF generado es el contrato final para firma y debe provenir de ese mismo DOCX ya renderizado, por lo que ambos archivos deben conservar el mismo contenido contractual, estructura, textos legales, firmas y placeholders sustituidos.
+
+El PDF **no** es un reporte de variables. El backend no genera archivos con sufijo `_PARA_FIRMA.pdf` usando tablas, listas de variables ni firmas genéricas de PDFKit. Si la conversión DOCX a PDF falla o no está disponible, el DOCX queda descargable y la metadata registra `PDF_CONVERSION_UNAVAILABLE` o el error técnico equivalente, pero no se publica un PDF inválido como documento de firma.
+
+Para generar PDF en local o servidor se requiere LibreOffice headless, o un conversor equivalente compatible con el flujo backend. Por defecto el servicio intenta ejecutar `soffice --headless --convert-to pdf --outdir <outputDir> <docxPath>` y luego `libreoffice` como alias. Si el binario está en una ruta no estándar, configure la variable de entorno `LIBREOFFICE_BIN` con el ejecutable correspondiente. También puede ajustar el tiempo máximo con `PDF_CONVERSION_TIMEOUT_MS` si el entorno necesita más tiempo para convertir documentos grandes.
