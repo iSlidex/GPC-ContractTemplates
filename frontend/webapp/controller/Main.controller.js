@@ -114,6 +114,8 @@ sap.ui.define([
                     docxUrl: "",
                     pdfText: "",
                     pdfUrl: "",
+                    pdfAvailable: false,
+                    pdfUnavailableMessage: "",
                     metadataText: "",
                     metadataUrl: ""
                 },
@@ -1422,7 +1424,7 @@ sap.ui.define([
             });
 
             const oDialog = new Dialog({
-                title: "Vista previa reporte PDF - " + oItem.name,
+                title: "Vista previa PDF final - " + oItem.name,
                 contentWidth: "90%",
                 contentHeight: "80%",
                 resizable: true,
@@ -2326,7 +2328,7 @@ sap.ui.define([
                 draggable: true,
                 content: [oDialogContent],
                 beginButton: new Button({
-                    text: "Generar DOCX y reporte PDF",
+                    text: "Generar DOCX y PDF final",
                     type: "Emphasized",
                     icon: "sap-icon://documents",
                     press: async function () {
@@ -2674,11 +2676,21 @@ sap.ui.define([
             oModel.setProperty("/hasGenerationResult", true);
             oModel.setProperty("/generationMessage", oResult.message || "Documentos generados correctamente");
 
+            const oPdfConversion = oResult.result && oResult.result.metadata
+                ? oResult.result.metadata.pdfConversion
+                : null;
+            const bPdfAvailable = Boolean(oResult.downloadUrls && oResult.downloadUrls.pdf);
+            const sPdfUnavailableMessage = oPdfConversion && oPdfConversion.message
+                ? oPdfConversion.message
+                : "El DOCX fue generado correctamente, pero no se pudo convertir a PDF. Configure LibreOffice/headless converter para generar el documento final de firma.";
+
             oModel.setProperty("/lastGeneration", {
-                docxText: "Descargar documento generado: " + sDocumentFileName,
+                docxText: "Ver documento generado: " + sDocumentFileName,
                 docxUrl: sApiBaseUrl + oResult.downloadUrls.docx,
-                pdfText: "Descargar reporte PDF de variables",
-                pdfUrl: sApiBaseUrl + oResult.downloadUrls.pdf,
+                pdfText: bPdfAvailable ? "Descargar PDF final para firma" : "PDF final no disponible",
+                pdfUrl: bPdfAvailable ? sApiBaseUrl + oResult.downloadUrls.pdf : "",
+                pdfAvailable: bPdfAvailable,
+                pdfUnavailableMessage: bPdfAvailable ? "" : sPdfUnavailableMessage,
                 metadataText: "Descargar metadata JSON",
                 metadataUrl: sApiBaseUrl + oResult.downloadUrls.metadata
             });
@@ -2708,6 +2720,40 @@ sap.ui.define([
                     : null;
             const aMessages = oVirtualDocument ? oVirtualDocument.messages || [] : [];
 
+            const bPdfAvailable = Boolean(oResult.downloadUrls && oResult.downloadUrls.pdf);
+            const sPdfUnavailableMessage = oResult.result &&
+                oResult.result.metadata &&
+                oResult.result.metadata.pdfConversion &&
+                oResult.result.metadata.pdfConversion.message
+                ? oResult.result.metadata.pdfConversion.message
+                : "El DOCX fue generado correctamente, pero no se pudo convertir a PDF. Configure LibreOffice/headless converter para generar el documento final de firma.";
+            const aGeneratedLinks = [
+                new Link({
+                    text: "Ver documento generado",
+                    href: sApiBaseUrl + oResult.downloadUrls.docx,
+                    target: "_blank"
+                })
+            ];
+
+            if (bPdfAvailable) {
+                aGeneratedLinks.push(new Link({
+                    text: "Descargar PDF final para firma",
+                    href: sApiBaseUrl + oResult.downloadUrls.pdf,
+                    target: "_blank"
+                }));
+            } else {
+                aGeneratedLinks.push(new ObjectStatus({
+                    text: sPdfUnavailableMessage,
+                    state: "Warning"
+                }));
+            }
+
+            aGeneratedLinks.push(new Link({
+                text: "Abrir metadata JSON",
+                href: sApiBaseUrl + oResult.downloadUrls.metadata,
+                target: "_blank"
+            }));
+
             const oDialog = new Dialog({
                 title: "Documentos generados",
                 contentWidth: "600px",
@@ -2735,23 +2781,7 @@ sap.ui.define([
                                 }).join("\n")
                             }).addStyleClass("sapUiSmallMarginBottom"),
 
-                            new Link({
-                                text: "Abrir documento generado",
-                                href: sApiBaseUrl + oResult.downloadUrls.docx,
-                                target: "_blank"
-                            }),
-
-                            new Link({
-                                text: "Abrir reporte PDF de variables",
-                                href: sApiBaseUrl + oResult.downloadUrls.pdf,
-                                target: "_blank"
-                            }),
-
-                            new Link({
-                                text: "Abrir metadata JSON",
-                                href: sApiBaseUrl + oResult.downloadUrls.metadata,
-                                target: "_blank"
-                            })
+...aGeneratedLinks
                         ]
                     }).addStyleClass("sapUiMediumMargin")
                 ],
@@ -2820,7 +2850,7 @@ sap.ui.define([
                 MessageToast.show("Variables SAP/mock refrescadas");
                 MessageBox.information(
                     (oResult.message || "Variables SAP/mock refrescadas") +
-                    "\n\nAviso: el refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX ni el reporte PDF."
+                    "\n\nAviso: el refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX ni el PDF final para firma."
                 );
             } catch (oError) {
                 oDialog.setBusy(false);
