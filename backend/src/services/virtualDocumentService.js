@@ -85,7 +85,7 @@ async function refreshVirtualDocument({ template, variables, contractNumber, val
     .map((variable) => variable.name);
 
   return {
-    message: `Refresh completado: ${refreshedSapVariables.length} variables SAP/mock actualizadas. Pendientes: ${pendingVariables.length ? pendingVariables.join(", ") : "ninguna"}. Este refresh no regenera automáticamente el DOCX ni el PDF; usa Generar documento/PDF para crear o regenerar los archivos.`,
+    message: `Refresh completado: ${refreshedSapVariables.length} variables SAP/mock actualizadas. Pendientes requeridos: ${pendingVariables.length ? pendingVariables.join(", ") : "ninguno"}. Este refresh solo actualiza datos automáticos SAP/mock; usa Completar campos de usuario para capturar valores manuales y Regenerar DOCX/PDF para producir archivos finales actualizados.`,
     refreshedVariables: refreshedSapVariables,
     pendingVariables,
     source: sapResult.source,

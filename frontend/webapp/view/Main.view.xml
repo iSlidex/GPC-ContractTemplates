@@ -398,9 +398,11 @@
                                                 <VBox class="gpcMetadataItem"><Label text="Última actualización" /><Text text="{app>/virtualDisplay/header/updatedAt}" /></VBox>
                                                 <VBox class="gpcMetadataItem"><Label text="Fuente de datos SAP/mock" /><Text text="{app>/virtualDisplay/header/dataSource}" /></VBox>
                                             </HBox>
-                                            <Text text="El refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX/PDF." class="gpcDiscreteNote sapUiSmallMarginTop" />
+                                            <Text text="Refrescar variables SAP/mock solo actualiza datos automáticos; Completar campos de usuario captura valores manuales; Regenerar DOCX/PDF produce archivos finales actualizados." class="gpcDiscreteNote sapUiSmallMarginTop" />
                                             <HBox renderType="Bare" wrap="Wrap" class="sapUiSmallMarginTop">
-                                                <Button text="Refrescar Variables SAP" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiTinyMarginEnd" />
+                                                <Button text="Refrescar variables SAP/mock" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiTinyMarginEnd" />
+                                                <Button text="Completar campos de usuario" icon="sap-icon://request" type="Default" press=".onCompleteUserFields" visible="{app>/virtualDisplay/canEditInputFields}" class="sapUiTinyMarginEnd" />
+                                                <Button text="Regenerar DOCX/PDF" icon="sap-icon://synchronize" type="Accept" press=".onRegenerateSelectedDocument" class="sapUiTinyMarginEnd" />
                                                 <Button text="Ver documento" icon="sap-icon://show" press=".onSelectedAssemblyDocumentPreview" class="sapUiTinyMarginEnd" />
                                                 <Button text="Ir al detalle" icon="sap-icon://detail-view" press=".onSelectedAssemblyDocumentDetail" />
                                             </HBox>
