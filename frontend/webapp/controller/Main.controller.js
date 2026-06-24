@@ -284,13 +284,23 @@ sap.ui.define([
                             continue;
                         }
 
-                        throw new Error(
+                        let oErrorPayload = null;
+                        try {
+                            oErrorPayload = sText ? JSON.parse(sText) : null;
+                        } catch (oParseError) {
+                            oErrorPayload = null;
+                        }
+
+                        const oHttpError = new Error(
                             oResponse.status +
                             " " +
                             oResponse.statusText +
                             " - " +
-                            sText
+                            (oErrorPayload && oErrorPayload.error ? oErrorPayload.error : sText)
                         );
+                        oHttpError.status = oResponse.status;
+                        oHttpError.payload = oErrorPayload;
+                        throw oHttpError;
                     }
 
                     if (!sText) {
@@ -2642,8 +2652,68 @@ sap.ui.define([
                 this._showGenerationDialog(oResult);
             } catch (oError) {
                 oParams.dialog.setBusy(false);
-                MessageBox.error("Error generando documentos:\n\n" + oError.message);
+                this._handleGenerationError(oError, "Error generando documentos");
             }
+        },
+
+        _getAssemblyReadiness: function () {
+            const oModel = this.getView().getModel("app");
+            const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
+            const aDefinitions = oVirtualDocument.variableDefinitions || [];
+            const mValues = oVirtualDocument.values || {};
+            const aMissingSapVariables = [];
+            const aMissingUserInputs = [];
+
+            aDefinitions.forEach(function (oDefinition) {
+                if (!oDefinition || !oDefinition.required || this._hasDisplayValue(mValues[oDefinition.name])) {
+                    return;
+                }
+
+                if (oDefinition.source === "SAP_VARIABLE") {
+                    aMissingSapVariables.push(oDefinition.name);
+                } else {
+                    aMissingUserInputs.push(oDefinition.name);
+                }
+            }.bind(this));
+
+            return {
+                isValid: !aMissingSapVariables.length && !aMissingUserInputs.length,
+                isBlocked: !!(aMissingSapVariables.length || aMissingUserInputs.length),
+                missingSapVariables: aMissingSapVariables,
+                missingUserInputs: aMissingUserInputs,
+                missingRequiredVariables: aMissingSapVariables.concat(aMissingUserInputs)
+            };
+        },
+
+        _showValidationDialog: function (oError) {
+            const oPayload = oError && oError.payload || {};
+            const oDetails = oPayload.details || oError.details || (oError && oError.details) || {};
+            const aSap = oDetails.missingSapVariables || [];
+            const aUser = oDetails.missingUserInputs || [];
+            const aLines = [];
+
+            if (aSap.length) {
+                aLines.push("Variables SAP/mock faltantes:");
+                aSap.forEach(function (sName) { aLines.push("• " + sName); });
+            }
+            if (aUser.length) {
+                aLines.push("Campos de usuario requeridos faltantes:");
+                aUser.forEach(function (sName) { aLines.push("• " + sName); });
+            }
+
+            this.getView().getModel("app").setProperty("/hasGenerationResult", false);
+            MessageBox.error((oPayload.error || "No se puede generar el contrato porque faltan datos requeridos.") + "\n\n" + (aLines.join("\n") || "Completa las variables requeridas antes de generar DOCX/PDF."), {
+                title: "Validación de ensamblaje"
+            });
+        },
+
+        _handleGenerationError: function (oError, sTitle) {
+            if (oError && (oError.status === 422 || (oError.payload && oError.payload.code === "DOCUMENT_VALIDATION_FAILED"))) {
+                this._showValidationDialog(oError);
+                return;
+            }
+
+            MessageBox.error(sTitle + ":\n\n" + oError.message);
         },
 
         _refreshRepositoryAfterGeneration: async function () {
@@ -2818,7 +2888,13 @@ sap.ui.define([
             const oContext = this._getVirtualDocumentRefreshContext();
 
             if (!oContext || !oContext.templateId || !oContext.contractNumber) {
-                MessageBox.warning("No hay documento virtual activo con templateId y contractNumber para regenerar DOCX/PDF.");
+                MessageBox.warning("No hay documento virtual activo con templateId y contractNumber para generar DOCX/PDF.");
+                return;
+            }
+
+            const oReadiness = this._getAssemblyReadiness();
+            if (oReadiness.isBlocked) {
+                this._showValidationDialog({ details: oReadiness });
                 return;
             }
 
@@ -2934,13 +3010,22 @@ sap.ui.define([
 
             if (aMissingSap.length) {
                 sStatus = "ERROR";
-                aMessages.push("Faltan variables SAP: " + aMissingSap.join(", "));
+                aMessages.push("Bloqueado por variables SAP faltantes: " + aMissingSap.join(", "));
             } else if (aMissingUser.length) {
                 sStatus = "PENDING";
-                aMessages.push("Faltan campos de usuario: " + aMissingUser.join(", "));
+                aMessages.push("Bloqueado por campos de usuario requeridos: " + aMissingUser.join(", "));
+            } else {
+                aMessages.push("Listo para generar");
             }
 
-            return { ...oVirtualDocument, status: sStatus, messages: aMessages };
+            return {
+                ...oVirtualDocument,
+                status: sStatus,
+                messages: aMessages,
+                missingSapVariables: aMissingSap,
+                missingUserInputs: aMissingUser,
+                missingRequiredVariables: aMissingSap.concat(aMissingUser)
+            };
         },
 
         _openUserFieldsDialog: function () {
@@ -3042,7 +3127,7 @@ sap.ui.define([
                 await this._refreshRepositoryAfterGeneration();
                 MessageBox.success((oResult.message || "DOCX/PDF regenerados correctamente") + "\n\nRegenerar DOCX/PDF produce archivos finales actualizados con datos SAP/mock y campos de usuario capturados.");
             } catch (oError) {
-                MessageBox.error("No se pudo regenerar DOCX/PDF:\n\n" + oError.message);
+                this._handleGenerationError(oError, "No se pudo generar DOCX/PDF");
             }
         },
 
@@ -3377,6 +3462,17 @@ sap.ui.define([
             const sUpdatedAt = oVirtualDocument.lastRefreshedAt || oVirtualDocument.updatedAt || oVirtualDocument.generatedAt || "";
 
             const aInputFields = this._normalizeInputFieldsForDisplay(oVirtualDocument.inputFields || {}, aDefinitions, mValues, oVirtualDocument.messages || []);
+            const oReadiness = this._getAssemblyReadiness();
+            let sReadinessText = "Listo para generar";
+            let sReadinessState = "Success";
+
+            if (oReadiness.missingSapVariables.length) {
+                sReadinessText = "Bloqueado por variables SAP faltantes";
+                sReadinessState = "Error";
+            } else if (oReadiness.missingUserInputs.length) {
+                sReadinessText = "Bloqueado por campos de usuario requeridos";
+                sReadinessState = "Warning";
+            }
 
             oModel.setProperty("/virtualDisplay", {
                 hasActiveDocument: true,
@@ -3397,7 +3493,12 @@ sap.ui.define([
                 inputFields: aInputFields,
                 canEditInputFields: aInputFields.some(function (oField) {
                     return oField.required || oField.status !== "Completado";
-                })
+                }),
+                readinessText: sReadinessText,
+                readinessState: sReadinessState,
+                canGenerate: !oReadiness.isBlocked,
+                missingSapVariables: oReadiness.missingSapVariables,
+                missingUserInputs: oReadiness.missingUserInputs
             });
         },
 
