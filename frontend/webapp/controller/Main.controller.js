@@ -1949,9 +1949,13 @@ sap.ui.define([
             }
 
             try {
-                oDialog.setBusy(true);
+                if (oDialog) {
+                    oDialog.setBusy(true);
+                }
                 const oResult = await this._fetchJson(sUrl, { method: "POST" });
-                oDialog.setBusy(false);
+                if (oDialog) {
+                    oDialog.setBusy(false);
+                }
                 MessageToast.show(this._labelForAction(sAction) + " ejecutada");
 
                 return oResult;
@@ -2806,6 +2810,21 @@ sap.ui.define([
             oDialog.open();
         },
 
+        onCompleteUserFields: function () {
+            this._openUserFieldsDialog();
+        },
+
+        onRegenerateSelectedDocument: async function () {
+            const oContext = this._getVirtualDocumentRefreshContext();
+
+            if (!oContext || !oContext.templateId || !oContext.contractNumber) {
+                MessageBox.warning("No hay documento virtual activo con templateId y contractNumber para regenerar DOCX/PDF.");
+                return;
+            }
+
+            await this._regenerateDocumentsFromAssembly(oContext);
+        },
+
         _refreshVirtualDocument: async function (oDialog) {
             const oModel = this.getView().getModel("app");
             const oContext = this._getVirtualDocumentRefreshContext();
@@ -2818,7 +2837,9 @@ sap.ui.define([
             const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
 
             try {
-                oDialog.setBusy(true);
+                if (oDialog) {
+                    oDialog.setBusy(true);
+                }
                 const oResult = await this._fetchJson(
                     sApiBaseUrl + "/api/virtual-documents/refresh",
                     {
@@ -2827,7 +2848,9 @@ sap.ui.define([
                         body: JSON.stringify(oContext)
                     }
                 );
-                oDialog.setBusy(false);
+                if (oDialog) {
+                    oDialog.setBusy(false);
+                }
 
                 this._lastGenerationContext = {
                     templateId: oContext.templateId,
@@ -2850,13 +2873,179 @@ sap.ui.define([
                 MessageToast.show("Variables SAP/mock refrescadas");
                 MessageBox.information(
                     (oResult.message || "Variables SAP/mock refrescadas") +
-                    "\n\nAviso: el refresh actualiza metadata y valores, pero todavía no regenera el archivo DOCX ni el PDF final para firma."
+                    "\n\nAviso: el refresh solo actualiza datos automáticos SAP/mock. Usa Completar campos de usuario para valores manuales y Regenerar DOCX/PDF para producir archivos finales actualizados."
                 );
             } catch (oError) {
-                oDialog.setBusy(false);
+                if (oDialog) {
+                    oDialog.setBusy(false);
+                }
                 MessageBox.error("No se pudo refrescar el documento virtual:\n\n" + oError.message);
             }
         },
+        _getRequiredUserFieldNamesFromMessages: function (vMessages) {
+            const aMessages = Array.isArray(vMessages) ? vMessages : (vMessages ? [vMessages] : []);
+            const aFields = [];
+
+            aMessages.forEach(function (vMessage) {
+                const sText = typeof vMessage === "object" && vMessage !== null
+                    ? String(vMessage.message || vMessage.text || "")
+                    : String(vMessage || "");
+
+                if (!/Faltan campos de usuario/i.test(sText)) {
+                    return;
+                }
+
+                sText.split(":").slice(1).join(":").split(",").forEach(function (sField) {
+                    const sName = sField.trim();
+                    if (sName) {
+                        aFields.push(sName);
+                    }
+                });
+            });
+
+            return aFields;
+        },
+
+        _recalculateVirtualDocumentState: function (oVirtualDocument) {
+            const aDefinitions = oVirtualDocument.variableDefinitions || [];
+            const mValues = oVirtualDocument.values || {};
+            const aMissingSap = [];
+            const aMissingUser = [];
+
+            aDefinitions.forEach(function (oDefinition) {
+                if (!oDefinition || !oDefinition.required) {
+                    return;
+                }
+
+                const bMissing = !this._hasDisplayValue(mValues[oDefinition.name]);
+                if (!bMissing) {
+                    return;
+                }
+
+                if (oDefinition.source === "SAP_VARIABLE") {
+                    aMissingSap.push(oDefinition.name);
+                } else {
+                    aMissingUser.push(oDefinition.name);
+                }
+            }.bind(this));
+
+            const aMessages = [];
+            let sStatus = "COMPLETED";
+
+            if (aMissingSap.length) {
+                sStatus = "ERROR";
+                aMessages.push("Faltan variables SAP: " + aMissingSap.join(", "));
+            } else if (aMissingUser.length) {
+                sStatus = "PENDING";
+                aMessages.push("Faltan campos de usuario: " + aMissingUser.join(", "));
+            }
+
+            return { ...oVirtualDocument, status: sStatus, messages: aMessages };
+        },
+
+        _openUserFieldsDialog: function () {
+            const oModel = this.getView().getModel("app");
+            const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
+            const aFields = oModel.getProperty("/virtualDisplay/inputFields") || [];
+            const aEditableFields = aFields.filter(function (oField) {
+                return oField && (oField.required || oField.status !== "Completado");
+            });
+            const aDialogFields = aEditableFields.length ? aEditableFields : aFields;
+            const mInputs = {};
+
+            if (!aDialogFields.length) {
+                MessageBox.information("No hay campos de usuario editables en este documento virtual.");
+                return;
+            }
+
+            const oDialog = new Dialog({
+                title: "Completar campos de usuario",
+                contentWidth: "520px",
+                resizable: true,
+                draggable: true,
+                content: [
+                    new VBox({
+                        items: [
+                            new Text({ text: "Captura valores manuales pendientes. Los campos opcionales no bloquean COMPLETED; los requeridos sí." }).addStyleClass("sapUiSmallMarginBottom"),
+                            ...aDialogFields.map(function (oField) {
+                                const oInput = new Input({
+                                    value: oField.rawValue || "",
+                                    type: String(oField.type || "").toLowerCase() === "email" ? "Email" : "Text",
+                                    placeholder: oField.required ? "Requerido" : "Opcional"
+                                });
+                                mInputs[oField.name] = oInput;
+                                return new VBox({
+                                    items: [
+                                        new Label({ text: oField.name + (oField.required ? " *" : "") }),
+                                        oInput
+                                    ]
+                                }).addStyleClass("sapUiTinyMarginBottom");
+                            })
+                        ]
+                    }).addStyleClass("sapUiMediumMargin")
+                ],
+                beginButton: new Button({
+                    text: "Guardar campos de usuario",
+                    type: "Emphasized",
+                    press: function () {
+                        const mValues = { ...(oVirtualDocument.values || {}) };
+                        const mInputFields = { ...(oVirtualDocument.inputFields || {}) };
+
+                        Object.keys(mInputs).forEach(function (sName) {
+                            mValues[sName] = mInputs[sName].getValue();
+                            mInputFields[sName] = mInputs[sName].getValue();
+                        });
+
+                        const oUpdated = this._recalculateVirtualDocumentState({
+                            ...oVirtualDocument,
+                            values: mValues,
+                            inputFields: mInputFields,
+                            updatedAt: new Date().toISOString()
+                        });
+
+                        oModel.setProperty("/virtualDocument", oUpdated);
+                        this._lastGenerationContext = {
+                            templateId: oUpdated.templateId,
+                            contractNumber: oUpdated.contractNumber,
+                            values: mValues
+                        };
+                        this._syncVirtualDocumentDisplay();
+                        this._updateSummaryCards();
+                        MessageToast.show("Campos de usuario guardados");
+                        oDialog.close();
+                    }.bind(this)
+                }),
+                endButton: new Button({ text: "Cancelar", press: function () { oDialog.close(); } }),
+                afterClose: function () { oDialog.destroy(); }
+            });
+
+            oDialog.open();
+        },
+
+        _regenerateDocumentsFromAssembly: async function (oContext) {
+            const oModel = this.getView().getModel("app");
+            const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
+
+            try {
+                const oResult = await this._fetchJson(sApiBaseUrl + "/api/templates/" + encodeURIComponent(oContext.templateId) + "/generate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contractNumber: oContext.contractNumber, values: oContext.values || {} })
+                });
+
+                this._setGenerationResult(oResult);
+                this._lastGenerationContext = {
+                    templateId: oContext.templateId,
+                    contractNumber: oContext.contractNumber,
+                    values: oContext.values || {}
+                };
+                await this._refreshRepositoryAfterGeneration();
+                MessageBox.success((oResult.message || "DOCX/PDF regenerados correctamente") + "\n\nRegenerar DOCX/PDF produce archivos finales actualizados con datos SAP/mock y campos de usuario capturados.");
+            } catch (oError) {
+                MessageBox.error("No se pudo regenerar DOCX/PDF:\n\n" + oError.message);
+            }
+        },
+
         _formatValueForDisplay: function (vValue) {
             if (vValue === null || vValue === undefined || vValue === "") {
                 return "—";
@@ -3080,7 +3269,9 @@ sap.ui.define([
             });
         },
 
-        _normalizeInputFieldsForDisplay: function (vInputFields, aDefinitions, mValues) {
+        _normalizeInputFieldsForDisplay: function (vInputFields, aDefinitions, mValues, vMessages) {
+            const aBlockingFields = this._getRequiredUserFieldNamesFromMessages(vMessages);
+
             return this._toKeyValueRows(vInputFields, {
                 definitions: aDefinitions,
                 values: mValues,
@@ -3089,10 +3280,14 @@ sap.ui.define([
                 completedStatus: "Completado",
                 missingStatus: "Pendiente"
             }).map(function (oRow) {
+                const bBlocksAssembly = aBlockingFields.includes(oRow.name);
+                const bRequired = oRow.required || bBlocksAssembly;
+
                 return {
                     ...oRow,
+                    required: bRequired,
                     field: oRow.name,
-                    requiredText: oRow.required ? "Sí" : "No"
+                    requiredText: bRequired ? "Sí" : "No"
                 };
             });
         },
@@ -3171,7 +3366,8 @@ sap.ui.define([
                     header: {},
                     messages: [],
                     variables: [],
-                    inputFields: []
+                    inputFields: [],
+                    canEditInputFields: false
                 });
                 return;
             }
@@ -3179,6 +3375,8 @@ sap.ui.define([
             const aDefinitions = oVirtualDocument.variableDefinitions || [];
             const mValues = oVirtualDocument.values || {};
             const sUpdatedAt = oVirtualDocument.lastRefreshedAt || oVirtualDocument.updatedAt || oVirtualDocument.generatedAt || "";
+
+            const aInputFields = this._normalizeInputFieldsForDisplay(oVirtualDocument.inputFields || {}, aDefinitions, mValues, oVirtualDocument.messages || []);
 
             oModel.setProperty("/virtualDisplay", {
                 hasActiveDocument: true,
@@ -3196,7 +3394,10 @@ sap.ui.define([
                 },
                 messages: this._normalizeVirtualDocumentMessages(oVirtualDocument.messages || []),
                 variables: this._normalizeVariablesForDisplay(oVirtualDocument.variables || {}, aDefinitions, mValues),
-                inputFields: this._normalizeInputFieldsForDisplay(oVirtualDocument.inputFields || {}, aDefinitions, mValues)
+                inputFields: aInputFields,
+                canEditInputFields: aInputFields.some(function (oField) {
+                    return oField.required || oField.status !== "Completado";
+                })
             });
         },
 
