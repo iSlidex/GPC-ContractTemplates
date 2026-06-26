@@ -1,12 +1,29 @@
 const { getContractData } = require("./sapContractService");
 
+function hasRequiredValue(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === "string") {
+    return value.trim() !== "";
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  return true;
+}
+
 function splitValuesByVariableType(variables, values) {
   return variables.reduce((result, variable) => {
     const target = variable.source === "SAP_VARIABLE"
       ? result.variables
       : result.inputFields;
 
-    target[variable.name] = values[variable.name] || "";
+    const value = values[variable.name];
+    target[variable.name] = value === null || value === undefined ? "" : value;
 
     return result;
   }, {
@@ -18,8 +35,36 @@ function splitValuesByVariableType(variables, values) {
 function getMissingRequired(variables, values, source) {
   return variables
     .filter((variable) => variable.required && variable.source === source)
-    .filter((variable) => !values[variable.name])
+    .filter((variable) => !hasRequiredValue(values[variable.name]))
     .map((variable) => variable.name);
+}
+
+function validateRequiredTemplateValues({ variables, values }) {
+  const sourceValues = values || {};
+  const missingSapVariables = getMissingRequired(variables || [], sourceValues, "SAP_VARIABLE");
+  const missingUserInputs = getMissingRequired(variables || [], sourceValues, "USER_INPUT");
+  const missingRequiredVariables = [...missingSapVariables, ...missingUserInputs];
+  const messages = [];
+
+  if (missingSapVariables.length > 0) {
+    messages.push(`Bloqueado por variables SAP faltantes: ${missingSapVariables.join(", ")}`);
+  }
+
+  if (missingUserInputs.length > 0) {
+    messages.push(`Bloqueado por campos de usuario requeridos: ${missingUserInputs.join(", ")}`);
+  }
+
+  if (!messages.length) {
+    messages.push("Listo para generar");
+  }
+
+  return {
+    isValid: missingRequiredVariables.length === 0,
+    missingSapVariables,
+    missingUserInputs,
+    missingRequiredVariables,
+    messages
+  };
 }
 
 function buildVirtualDocumentMetadata({
@@ -98,5 +143,7 @@ async function refreshVirtualDocument({ template, variables, contractNumber, val
 
 module.exports = {
   buildVirtualDocumentMetadata,
-  refreshVirtualDocument
+  hasRequiredValue,
+  refreshVirtualDocument,
+  validateRequiredTemplateValues
 };

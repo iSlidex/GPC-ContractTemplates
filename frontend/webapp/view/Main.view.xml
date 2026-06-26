@@ -387,7 +387,7 @@
                                 </VBox>
 
                                 <VBox visible="{app>/virtualDisplay/hasActiveDocument}">
-                                    <Panel id="virtualDocumentPanel" headerText="Documento virtual seleccionado" class="gpcEcmCard" expandable="false">
+                                    <Panel id="virtualDocumentPanel" headerText="Validación de ensamblaje" class="gpcEcmCard" expandable="false">
                                         <content>
                                             <HBox wrap="Wrap" class="gpcMetadataGrid">
                                                 <VBox class="gpcMetadataItem"><Label text="ID documento virtual" /><Text text="{app>/virtualDisplay/header/virtualDocumentId}" /></VBox>
@@ -398,11 +398,12 @@
                                                 <VBox class="gpcMetadataItem"><Label text="Última actualización" /><Text text="{app>/virtualDisplay/header/updatedAt}" /></VBox>
                                                 <VBox class="gpcMetadataItem"><Label text="Fuente de datos SAP/mock" /><Text text="{app>/virtualDisplay/header/dataSource}" /></VBox>
                                             </HBox>
-                                            <Text text="Refrescar variables SAP/mock solo actualiza datos automáticos; Completar campos de usuario captura valores manuales; Regenerar DOCX/PDF produce archivos finales actualizados." class="gpcDiscreteNote sapUiSmallMarginTop" />
+                                            <Text text="Verifica que todas las variables requeridas estén completas antes de generar el contrato." class="gpcDiscreteNote sapUiSmallMarginTop" />
+                                            <ObjectStatus text="{app>/virtualDisplay/readinessText}" state="{app>/virtualDisplay/readinessState}" class="sapUiTinyMarginTop" />
                                             <HBox renderType="Bare" wrap="Wrap" class="sapUiSmallMarginTop">
                                                 <Button text="Refrescar variables SAP/mock" icon="sap-icon://refresh" type="Emphasized" press=".onRefreshVirtualDocument" class="sapUiTinyMarginEnd" />
                                                 <Button text="Completar campos de usuario" icon="sap-icon://request" type="Default" press=".onCompleteUserFields" visible="{app>/virtualDisplay/canEditInputFields}" class="sapUiTinyMarginEnd" />
-                                                <Button text="Regenerar DOCX/PDF" icon="sap-icon://synchronize" type="Accept" press=".onRegenerateSelectedDocument" class="sapUiTinyMarginEnd" />
+                                                <Button text="Generar DOCX/PDF" icon="sap-icon://synchronize" type="Accept" press=".onRegenerateSelectedDocument" enabled="{app>/virtualDisplay/canGenerate}" class="sapUiTinyMarginEnd" />
                                                 <Button text="Ver documento" icon="sap-icon://show" press=".onSelectedAssemblyDocumentPreview" class="sapUiTinyMarginEnd" />
                                                 <Button text="Ir al detalle" icon="sap-icon://detail-view" press=".onSelectedAssemblyDocumentDetail" />
                                             </HBox>

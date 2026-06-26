@@ -8,7 +8,8 @@ const {
   getTemplateAbsolutePath
 } = require("./templateMetadataService");
 const {
-  buildVirtualDocumentMetadata
+  buildVirtualDocumentMetadata,
+  validateRequiredTemplateValues
 } = require("./virtualDocumentService");
 const { classifyCatalogVariable } = require("../domain/variableCatalog");
 const { convertDocxToPdf } = require("./pdfConversionService");
@@ -214,7 +215,7 @@ function renderStringTemplate(content, values) {
 
   Object.entries(values).forEach(([key, value]) => {
     const regex = new RegExp("\\{" + key + "\\}", "g");
-    rendered = rendered.replace(regex, value || "");
+    rendered = rendered.replace(regex, value === null || value === undefined ? "" : value);
   });
 
   return rendered;
@@ -309,10 +310,26 @@ async function generateContractDocuments({ templateId, contractNumber, values })
   const template = variablesInfo.template;
   const templatePath = getTemplateAbsolutePath(template);
 
+  const validation = validateRequiredTemplateValues({
+    variables: variablesInfo.variables,
+    values: values || {}
+  });
+
+  if (!validation.isValid) {
+    const error = new Error("No se puede generar el contrato: faltan variables requeridas.");
+    error.statusCode = 422;
+    error.code = "DOCUMENT_VALIDATION_FAILED";
+    error.details = validation;
+    throw error;
+  }
+
   const normalizedValues = {};
 
   variablesInfo.variables.forEach((variable) => {
-    normalizedValues[variable.name] = values[variable.name] || "";
+    const value = values[variable.name];
+    normalizedValues[variable.name] = value === null || value === undefined
+      ? ""
+      : value;
   });
 
   let generatedDocument;
