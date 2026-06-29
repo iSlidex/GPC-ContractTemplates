@@ -16,6 +16,17 @@ const { convertDocxToPdf } = require("./pdfConversionService");
 
 const REPO_ROOT = path.resolve(__dirname, "../../repository");
 
+function getCurrentUserContext(userContext = {}) {
+  return {
+    id: userContext.id || userContext.userId || process.env.GPC_MOCK_USER_ID || "demo.user",
+    email: userContext.email || process.env.GPC_MOCK_USER_EMAIL || "usuario.demo@gpc.local"
+  };
+}
+
+function isProductionMode() {
+  return String(process.env.NODE_ENV || "").toLowerCase() === "production";
+}
+
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
@@ -296,6 +307,18 @@ function buildPdfFileName({ template, contractNumber }) {
   return `CTR_${contractNumber}_${template.category}_${template.contractType}_${template.version}_PARA_FIRMA.pdf`;
 }
 
+function enrichValuesWithSessionFallbacks(variables, values, userContext) {
+  const normalizedValues = { ...(values || {}) };
+  const requiresSalesSupportEmail = (variables || []).some((variable) => variable.name === "SALES_SUPPORT_EMAIL" && variable.required);
+
+  if (requiresSalesSupportEmail && !normalizedValues.SALES_SUPPORT_EMAIL) {
+    // Fallback temporal hasta integrar identidad real SAP/BTP.
+    normalizedValues.SALES_SUPPORT_EMAIL = getCurrentUserContext(userContext).email;
+  }
+
+  return normalizedValues;
+}
+
 function buildPdfUnavailableMetadata(error) {
   return {
     available: false,
@@ -305,14 +328,66 @@ function buildPdfUnavailableMetadata(error) {
   };
 }
 
-async function generateContractDocuments({ templateId, contractNumber, values }) {
+function findLatestMetadata(predicate) {
+  const metadataDir = path.join(REPO_ROOT, "generated", "metadata");
+  let latest = null;
+
+  if (!fs.existsSync(metadataDir)) {
+    return null;
+  }
+
+  flattenTree(walkFiles(metadataDir, REPO_ROOT))
+    .filter((file) => file.type === "file" && file.extension === ".json")
+    .forEach((file) => {
+      try {
+        const metadata = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, file.relativePath), "utf8"));
+        const enriched = { metadata, file };
+        if (predicate(enriched) && (!latest || String(metadata.generatedAt || file.modifiedAt || "") > String(latest.metadata.generatedAt || latest.file.modifiedAt || ""))) {
+          latest = enriched;
+        }
+      } catch (error) {
+        // Ignore invalid generated metadata.
+      }
+    });
+
+  return latest;
+}
+
+function throwIfVirtualDocumentFinal({ templateId, contractNumber, virtualDocumentId }) {
+  const latest = findLatestMetadata(({ metadata }) => {
+    const virtualDocument = metadata.virtualDocument || {};
+    return virtualDocument.status === "FINAL" && (
+      (virtualDocumentId && virtualDocument.virtualDocumentId === virtualDocumentId) ||
+      (templateId && contractNumber && metadata.templateId === templateId && String(metadata.contractNumber) === String(contractNumber))
+    );
+  });
+
+  if (latest) {
+    const error = new Error("El documento virtual ya está FINAL. No se puede editar, refrescar variables ni regenerar documentos.");
+    error.statusCode = 409;
+    error.code = "DOCUMENT_ALREADY_FINAL";
+    throw error;
+  }
+}
+
+function getMetadataByVirtualDocumentId(virtualDocumentId) {
+  return findLatestMetadata(({ metadata }) => {
+    const virtualDocument = metadata.virtualDocument || {};
+    return virtualDocument.virtualDocumentId === virtualDocumentId;
+  });
+}
+
+async function generateContractDocuments({ templateId, contractNumber, values, userContext }) {
   const variablesInfo = extractTemplateVariables(templateId);
   const template = variablesInfo.template;
   const templatePath = getTemplateAbsolutePath(template);
 
+  throwIfVirtualDocumentFinal({ templateId, contractNumber });
+
+  const effectiveValues = enrichValuesWithSessionFallbacks(variablesInfo.variables, values, userContext);
   const validation = validateRequiredTemplateValues({
     variables: variablesInfo.variables,
-    values: values || {}
+    values: effectiveValues
   });
 
   if (!validation.isValid) {
@@ -326,7 +401,7 @@ async function generateContractDocuments({ templateId, contractNumber, values })
   const normalizedValues = {};
 
   variablesInfo.variables.forEach((variable) => {
-    const value = values[variable.name];
+    const value = effectiveValues[variable.name];
     normalizedValues[variable.name] = value === null || value === undefined
       ? ""
       : value;
@@ -801,6 +876,92 @@ function getBusinessDocuments(query = {}) {
   };
 }
 
+function finalizeVirtualDocument({ virtualDocumentId, userContext }) {
+  const found = getMetadataByVirtualDocumentId(virtualDocumentId);
+
+  if (!found) {
+    const error = new Error("Documento virtual no encontrado.");
+    error.statusCode = 404;
+    error.code = "DOCUMENT_NOT_FOUND";
+    throw error;
+  }
+
+  const metadata = found.metadata;
+  const virtualDocument = metadata.virtualDocument || {};
+  const pdf = metadata.files && metadata.files.pdf;
+  const document = metadata.files && metadata.files.document;
+  const missingRequiredVariables = virtualDocument.missingRequiredVariables || [];
+  const warnings = [];
+  const reasons = [];
+
+  if (virtualDocument.status === "FINAL") {
+    const error = new Error("El documento virtual ya está FINAL.");
+    error.statusCode = 409;
+    error.code = "DOCUMENT_ALREADY_FINAL";
+    throw error;
+  }
+
+  if (virtualDocument.status !== "COMPLETED") {
+    reasons.push("El estado actual debe ser COMPLETED.");
+  }
+  if (missingRequiredVariables.length) {
+    reasons.push("Existen variables requeridas faltantes: " + missingRequiredVariables.join(", "));
+  }
+  if (!document || !document.relativePath || !fs.existsSync(path.join(REPO_ROOT, document.relativePath))) {
+    reasons.push("No existe DOCX generado.");
+  }
+  if (!pdf || !pdf.available || !pdf.relativePath || !fs.existsSync(path.join(REPO_ROOT, pdf.relativePath))) {
+    reasons.push("No existe PDF final generado.");
+  } else if (pdf.fallback || pdf.documentRole !== "SIGNATURE_FINAL") {
+    reasons.push("El PDF disponible no es el PDF final para firma.");
+  }
+
+  const templateStatus = String((metadata.template && metadata.template.status) || "").toUpperCase();
+  if (templateStatus !== "RELEASED") {
+    if (templateStatus === "APPROVED" && !isProductionMode()) {
+      warnings.push("Modo demo: se permite finalizar con plantilla APPROVED; en productivo se exigirá RELEASED.");
+    } else {
+      reasons.push("La plantilla debe estar RELEASED para finalizar en productivo.");
+    }
+  }
+
+  if (reasons.length) {
+    const error = new Error("No se puede marcar como FINAL.");
+    error.statusCode = 422;
+    error.code = "DOCUMENT_FINALIZE_VALIDATION_FAILED";
+    error.details = { reasons };
+    throw error;
+  }
+
+  const now = new Date().toISOString();
+  const currentUser = getCurrentUserContext(userContext);
+  metadata.status = "FINAL";
+  metadata.finalizedAt = now;
+  metadata.finalizedBy = currentUser.email;
+  metadata.finalizationWarnings = warnings;
+  metadata.virtualDocument = {
+    ...virtualDocument,
+    status: "FINAL",
+    finalizedAt: now,
+    finalizedBy: currentUser.email,
+    warnings
+  };
+
+  fs.writeFileSync(path.join(REPO_ROOT, found.file.relativePath), JSON.stringify(metadata, null, 2));
+
+  return { message: "Documento virtual marcado como FINAL.", metadata, warnings };
+}
+
+function isSourcePathFinal(sourcePath) {
+  const relative = String(sourcePath || "");
+  const found = findLatestMetadata(({ metadata }) => {
+    const files = metadata.files || {};
+    const paths = [files.document && files.document.relativePath, files.pdf && files.pdf.relativePath];
+    return (metadata.virtualDocument || {}).status === "FINAL" && paths.includes(relative);
+  });
+  return !!found;
+}
+
 function getFileForDownload(relativePath) {
   const fullPath = safeJoin(REPO_ROOT, relativePath);
 
@@ -819,5 +980,9 @@ module.exports = {
   getTemplates,
   extractTemplateVariables,
   generateContractDocuments,
-  getFileForDownload
+  getFileForDownload,
+  finalizeVirtualDocument,
+  isSourcePathFinal,
+  throwIfVirtualDocumentFinal,
+  getCurrentUserContext
 };

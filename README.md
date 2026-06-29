@@ -434,3 +434,13 @@ El DOCX generado es el contrato editable renderizado por Docxtemplater desde la 
 El PDF **no** es un reporte de variables. El backend no genera archivos con sufijo `_PARA_FIRMA.pdf` usando tablas, listas de variables ni firmas genéricas de PDFKit. Si la conversión DOCX a PDF falla o no está disponible, el DOCX queda descargable y la metadata registra `PDF_CONVERSION_UNAVAILABLE` o el error técnico equivalente, pero no se publica un PDF inválido como documento de firma.
 
 Para generar PDF en local o servidor se requiere LibreOffice headless, o un conversor equivalente compatible con el flujo backend. Por defecto el servicio intenta ejecutar `soffice --headless --convert-to pdf --outdir <outputDir> <docxPath>` y luego `libreoffice` como alias. Si el binario está en una ruta no estándar, configure la variable de entorno `LIBREOFFICE_BIN` con el ejecutable correspondiente. También puede ajustar el tiempo máximo con `PDF_CONVERSION_TIMEOUT_MS` si el entorno necesita más tiempo para convertir documentos grandes.
+
+### Documento virtual: navegación simplificada y estado FINAL
+
+La pestaña **Ensamblaje** permanece oculta del flujo principal para usuarios finales. La validación de ensamblaje sigue activa en backend y en los modelos internos: no se genera DOCX/PDF si faltan variables requeridas.
+
+`SALES_SUPPORT_EMAIL` se autocompleta temporalmente desde el contexto de usuario de sesión/mock (`usuario.demo@gpc.local` por defecto) hasta integrar identidad real SAP/BTP.
+
+Un documento virtual `COMPLETED` con DOCX y PDF final para firma puede marcarse como `FINAL` mediante `POST /api/virtual-documents/:virtualDocumentId/finalize` desde **Documentos** o el detalle del documento. Al quedar `FINAL`, el backend bloquea refresh de variables, edición de campos y regeneración con `409 DOCUMENT_ALREADY_FINAL`; siguen disponibles descargas de DOCX/PDF, metadata JSON y vista previa cuando exista.
+
+La carga real de archivos y el historial funcional persistente quedan pendientes. La UI muestra **Cargar archivo (Próximamente)** deshabilitado e informa “Historial funcional pendiente de persistencia.” cuando no hay historial real.

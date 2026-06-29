@@ -421,6 +421,8 @@ sap.ui.define([
                     fileBadges: this._getDocumentFileBadges(oDocument),
                     statusCssClass: this._statusToCssClass(oDocument.status),
                     assemblyCssClass: this._statusToCssClass(oDocument.assemblyStatus),
+                    canFinalize: this._canFinalizeDocument(oDocument),
+                    canEditDocument: String(oDocument.assemblyStatus || "").toUpperCase() !== "FINAL",
                     templateText: [oDocument.templateId, oDocument.templateVersion].filter(Boolean).join(" / "),
                     versionsText: (oDocument.versionCount || 1) + " archivo(s) relacionado(s)"
                 };
@@ -1210,6 +1212,61 @@ sap.ui.define([
             });
         },
 
+
+        _canFinalizeDocument: function (oItem) {
+            const aMissing = (oItem.virtualDocument && oItem.virtualDocument.missingRequiredVariables) || oItem.missingRequiredVariables || [];
+            const bHasDocx = (oItem.relatedFiles || []).some(function (oFile) { return oFile.type === "DOCX"; });
+            const bHasPdf = (oItem.relatedFiles || []).some(function (oFile) { return oFile.type === "PDF"; });
+            return String(oItem.assemblyStatus || "").toUpperCase() === "COMPLETED" && bHasDocx && bHasPdf && !aMissing.length;
+        },
+
+        onFinalizeDocument: function (oEvent) {
+            const oContext = this._getContextFromEvent(oEvent);
+            if (oContext) {
+                this._confirmFinalizeDocument(oContext.getObject());
+            }
+        },
+
+        _confirmFinalizeDocument: function (oItem, oDialog) {
+            MessageBox.confirm("Después de marcar el documento como final, no podrá editar campos, refrescar variables ni regenerar documentos.", {
+                title: "Marcar como final",
+                actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
+                emphasizedAction: MessageBox.Action.OK,
+                onClose: async function (sAction) {
+                    if (sAction !== MessageBox.Action.OK) {
+                        return;
+                    }
+                    await this._finalizeDocument(oItem, oDialog);
+                }.bind(this)
+            });
+        },
+
+        _finalizeDocument: async function (oItem, oDialog) {
+            const sApiBaseUrl = this.getView().getModel("app").getProperty("/apiBaseUrl");
+            const sVirtualDocumentId = oItem && oItem.virtualDocument && oItem.virtualDocument.virtualDocumentId;
+            if (!sVirtualDocumentId) {
+                MessageBox.warning("No hay ID de documento virtual para marcar como final.");
+                return;
+            }
+            try {
+                const oResult = await this._fetchJson(sApiBaseUrl + "/api/virtual-documents/" + encodeURIComponent(sVirtualDocumentId) + "/finalize", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userContext: this._getCurrentUserContext() })
+                });
+                await this._refreshRepositoryAfterGeneration();
+                if (oDialog) { oDialog.close(); }
+                MessageBox.success((oResult.message || "Documento marcado como FINAL.") + (oResult.warnings && oResult.warnings.length ? "\n\nAdvertencias:\n• " + oResult.warnings.join("\n• ") : ""));
+            } catch (oError) {
+                if (oError.status === 409 && oError.payload && oError.payload.code === "DOCUMENT_ALREADY_FINAL") {
+                    this._showDocumentAlreadyFinal();
+                    return;
+                }
+                const aReasons = oError.payload && oError.payload.details && oError.payload.details.reasons || [];
+                MessageBox.error((oError.payload && oError.payload.error || "No se pudo marcar como final.") + (aReasons.length ? "\n\nRazones:\n• " + aReasons.join("\n• ") : "\n\n" + oError.message));
+            }
+        },
+
         _openDocumentDetailDialog: function (oItem, sInitialTabKey) {
             const oModel = this.getView().getModel("app");
             oModel.setProperty("/selectedDocument", oItem);
@@ -1303,13 +1360,9 @@ sap.ui.define([
                                 items: [
                                     new Button({ text: "Descargar", icon: "sap-icon://download", press: function () { this._downloadRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
                                     new Button({ text: "Vista previa", icon: "sap-icon://show", press: function () { this._previewRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Editar RichText", icon: "sap-icon://edit", press: function () { this._editRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
+                                    new Button({ text: "Editar RichText", icon: "sap-icon://edit", enabled: String(oItem.assemblyStatus || "").toUpperCase() !== "FINAL", press: function () { this._editRepositoryFile(this._toRepositoryFileItem(oItem)); }.bind(this) }).addStyleClass("sapUiTinyMarginEnd"),
                                     new Button({ text: "Versiones", icon: "sap-icon://history", press: function () { oTabBar.setSelectedKey("files"); } }).addStyleClass("sapUiTinyMarginEnd"),
-                                    new Button({ text: "Ver ensamblaje", icon: "sap-icon://synchronize", type: "Emphasized", press: function () {
-                                        this._selectDocumentForAssembly(oItem);
-                                        this.onGoToVirtualAssembly();
-                                        oDialog.close();
-                                    }.bind(this) })
+                                    new Button({ text: "Marcar como final", icon: "sap-icon://accept", type: "Emphasized", visible: this._canFinalizeDocument(oItem), press: function () { this._confirmFinalizeDocument(oItem, oDialog); }.bind(this) })
                                 ]
                             }).addStyleClass("sapUiSmallMarginBottom"),
                             oTabBar
@@ -2350,7 +2403,8 @@ sap.ui.define([
                             dialog: oDialog,
                             template: oTemplate,
                             contractNumberInput: oContractNumberInput,
-                            inputsByVariable: oInputsByVariable
+                            inputsByVariable: oInputsByVariable,
+                            variables: aVariables || []
                         });
                     }.bind(this)
                 }),
@@ -2597,6 +2651,38 @@ sap.ui.define([
             return "Text";
         },
 
+
+        _getCurrentUserContext: function () {
+            const oContext = this.getView().getModel("app").getProperty("/appContext") || {};
+            return {
+                id: oContext.owner || "demo.user",
+                email: oContext.email || "usuario.demo@gpc.local"
+            };
+        },
+
+        _applySessionFallbacksToValues: function (aVariables, mValues) {
+            const mResolvedValues = { ...(mValues || {}) };
+            const bRequiresSalesSupportEmail = (aVariables || []).some(function (oVariable) {
+                return oVariable && oVariable.name === "SALES_SUPPORT_EMAIL" && oVariable.required;
+            });
+
+            if (bRequiresSalesSupportEmail && !this._hasDisplayValue(mResolvedValues.SALES_SUPPORT_EMAIL)) {
+                // Fallback temporal hasta integrar identidad real SAP/BTP.
+                mResolvedValues.SALES_SUPPORT_EMAIL = this._getCurrentUserContext().email;
+            }
+
+            return mResolvedValues;
+        },
+
+        _isVirtualDocumentFinal: function () {
+            const oVirtualDocument = this.getView().getModel("app").getProperty("/virtualDocument") || {};
+            return String(oVirtualDocument.status || "").toUpperCase() === "FINAL";
+        },
+
+        _showDocumentAlreadyFinal: function () {
+            MessageBox.warning("El documento ya está FINAL. Puedes descargar DOCX/PDF/metadata, pero no editar campos, refrescar variables ni regenerar documentos.");
+        },
+
         _generateDocumentsFromDialog: async function (oParams) {
             const oModel = this.getView().getModel("app");
             const sApiBaseUrl = oModel.getProperty("/apiBaseUrl");
@@ -2616,6 +2702,8 @@ sap.ui.define([
                 oValues[sVariableName] = oParams.inputsByVariable[sVariableName].getValue();
             });
 
+            const mResolvedValues = this._applySessionFallbacksToValues(oParams.variables || [], oValues);
+
             try {
                 oParams.dialog.setBusy(true);
 
@@ -2631,7 +2719,8 @@ sap.ui.define([
                         },
                         body: JSON.stringify({
                             contractNumber: sContractNumber,
-                            values: oValues
+                            values: mResolvedValues,
+                            userContext: this._getCurrentUserContext()
                         })
                     }
                 );
@@ -2643,7 +2732,7 @@ sap.ui.define([
                 this._lastGenerationContext = {
                     templateId: oParams.template.templateId,
                     contractNumber: sContractNumber,
-                    values: oValues
+                    values: mResolvedValues
                 };
 
                 await this._refreshRepositoryAfterGeneration();
@@ -2892,6 +2981,11 @@ sap.ui.define([
                 return;
             }
 
+            if (this._isVirtualDocumentFinal()) {
+                this._showDocumentAlreadyFinal();
+                return;
+            }
+
             const oReadiness = this._getAssemblyReadiness();
             if (oReadiness.isBlocked) {
                 this._showValidationDialog({ details: oReadiness });
@@ -2903,6 +2997,10 @@ sap.ui.define([
 
         _refreshVirtualDocument: async function (oDialog) {
             const oModel = this.getView().getModel("app");
+            if (this._isVirtualDocumentFinal()) {
+                this._showDocumentAlreadyFinal();
+                return;
+            }
             const oContext = this._getVirtualDocumentRefreshContext();
 
             if (!oContext || !oContext.templateId || !oContext.contractNumber) {
@@ -2954,6 +3052,10 @@ sap.ui.define([
             } catch (oError) {
                 if (oDialog) {
                     oDialog.setBusy(false);
+                }
+                if (oError && oError.status === 409 && oError.payload && oError.payload.code === "DOCUMENT_ALREADY_FINAL") {
+                    this._showDocumentAlreadyFinal();
+                    return;
                 }
                 MessageBox.error("No se pudo refrescar el documento virtual:\n\n" + oError.message);
             }
@@ -3031,6 +3133,10 @@ sap.ui.define([
         _openUserFieldsDialog: function () {
             const oModel = this.getView().getModel("app");
             const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
+            if (String(oVirtualDocument.status || "").toUpperCase() === "FINAL") {
+                this._showDocumentAlreadyFinal();
+                return;
+            }
             const aFields = oModel.getProperty("/virtualDisplay/inputFields") || [];
             const aEditableFields = aFields.filter(function (oField) {
                 return oField && (oField.required || oField.status !== "Completado");
@@ -3115,7 +3221,7 @@ sap.ui.define([
                 const oResult = await this._fetchJson(sApiBaseUrl + "/api/templates/" + encodeURIComponent(oContext.templateId) + "/generate", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ contractNumber: oContext.contractNumber, values: oContext.values || {} })
+                    body: JSON.stringify({ contractNumber: oContext.contractNumber, values: oContext.values || {}, userContext: this._getCurrentUserContext() })
                 });
 
                 this._setGenerationResult(oResult);
@@ -3423,10 +3529,15 @@ sap.ui.define([
         _getVirtualDocumentRefreshContext: function () {
             const oModel = this.getView().getModel("app");
             const oVirtualDocument = oModel.getProperty("/virtualDocument") || {};
+            if (String(oVirtualDocument.status || "").toUpperCase() === "FINAL") {
+                this._showDocumentAlreadyFinal();
+                return;
+            }
             const oSelectedDocument = oModel.getProperty("/selectedDocument") || {};
             const oLastContext = this._lastGenerationContext || {};
 
             return {
+                virtualDocumentId: oVirtualDocument.virtualDocumentId || (oSelectedDocument.virtualDocument && oSelectedDocument.virtualDocument.virtualDocumentId) || oLastContext.virtualDocumentId,
                 templateId: oVirtualDocument.templateId || oSelectedDocument.templateId || oLastContext.templateId,
                 contractNumber: oVirtualDocument.contractNumber || oSelectedDocument.contractNumber || oLastContext.contractNumber,
                 values: oVirtualDocument.values || oSelectedDocument.values || oLastContext.values || {}
