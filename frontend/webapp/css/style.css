@@ -63,20 +63,26 @@
 }
 
 .gpcMainTabs {
-    margin: 1.5rem 1.5rem 0 1.5rem;
+    margin: 0;
+    background: #ffffff;
 }
 
 .gpcMainTabs .sapMITBHead {
     background: #ffffff;
     border-bottom: 1px solid #d9e2ec;
-    padding: 0.75rem 1rem 0.65rem 1rem;
-    min-height: 5.5rem;
+    padding: 0.85rem 1.5rem 0.75rem 1.5rem;
+    min-height: auto;
     box-sizing: border-box;
 }
 
 .gpcMainTabs .sapMITBFilter {
-    min-width: 7.5rem;
+    min-width: 8.75rem;
     margin-right: 0.5rem;
+}
+
+.gpcMainTabs .sapMITBText {
+    max-width: 8rem;
+    white-space: nowrap;
 }
 
 .gpcMainTabs .sapMITBSelected .sapMITBText,
@@ -88,14 +94,23 @@
     border-bottom-color: #0070d2 !important;
 }
 
-.gpcMainTabs .sapMITBContent {
+.gpcMainTabs .sapMITBContainerContent {
     background: #f3f4f6;
-    padding-top: 1.5rem;
+    border-top: 0;
+    padding: 2rem 1.5rem 2rem 1.5rem;
+    box-sizing: border-box;
+    overflow: visible;
+}
+
+.gpcMainTabs .sapMITBContent {
+    background: transparent;
+    padding: 0;
     overflow: visible;
 }
 
 .gpcTabContent {
-    padding: 1.5rem 0 2rem 0;
+    padding: 0;
+    margin: 0;
     box-sizing: border-box;
 }
 
@@ -117,6 +132,7 @@
     background: transparent;
     border: 0;
     padding: 0 0 1rem 0;
+    margin: 0 0 0.75rem 0;
     overflow: visible;
     align-items: flex-start;
 }
@@ -124,6 +140,7 @@
 .gpcCardToolbar .sapMTitle {
     line-height: 1.35;
     margin-top: 0;
+    overflow: visible;
 }
 
 .gpcPrimaryButton .sapMBtnInner,

@@ -470,7 +470,7 @@
                             </VBox>
                         </IconTabFilter>
 
-                        <IconTabFilter id="repositoryTab" key="repository" text="Repositorio técnico" icon="sap-icon://folder">
+                        <IconTabFilter id="repositoryTab" key="repository" text="Repositorio" icon="sap-icon://folder" tooltip="Repositorio técnico">
                             <VBox id="repositoryContent" class="gpcTabContent">
                                 <Toolbar class="gpcCardToolbar"><VBox><Title text="Repositorio técnico de archivos y versiones" level="H3" /><Text text="Vista completa de carpetas internas, versiones, documentos generados y evidencias técnicas." /></VBox></Toolbar>
                                 <Panel id="repositoryPanel" headerText="Vista técnica" expandable="false" class="gpcEcmCard">
