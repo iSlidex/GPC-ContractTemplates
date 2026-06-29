@@ -63,13 +63,20 @@
 }
 
 .gpcMainTabs {
-    margin: 1rem 1.5rem 1.5rem 1.5rem;
+    margin: 1.5rem 1.5rem 0 1.5rem;
 }
 
 .gpcMainTabs .sapMITBHead {
     background: #ffffff;
     border-bottom: 1px solid #d9e2ec;
-    padding: 0 0.5rem;
+    padding: 0.75rem 1rem 0.65rem 1rem;
+    min-height: 5.5rem;
+    box-sizing: border-box;
+}
+
+.gpcMainTabs .sapMITBFilter {
+    min-width: 7.5rem;
+    margin-right: 0.5rem;
 }
 
 .gpcMainTabs .sapMITBSelected .sapMITBText,
@@ -81,8 +88,15 @@
     border-bottom-color: #0070d2 !important;
 }
 
+.gpcMainTabs .sapMITBContent {
+    background: #f3f4f6;
+    padding-top: 1.5rem;
+    overflow: visible;
+}
+
 .gpcTabContent {
-    padding: 1.25rem 0 2rem 0;
+    padding: 1.5rem 0 2rem 0;
+    box-sizing: border-box;
 }
 
 .gpcEcmCard {
@@ -98,9 +112,18 @@
 }
 
 .gpcCardToolbar {
+    min-height: auto;
+    height: auto;
     background: transparent;
     border: 0;
-    padding: 0.5rem 0 1rem 0;
+    padding: 0 0 1rem 0;
+    overflow: visible;
+    align-items: flex-start;
+}
+
+.gpcCardToolbar .sapMTitle {
+    line-height: 1.35;
+    margin-top: 0;
 }
 
 .gpcPrimaryButton .sapMBtnInner,
@@ -449,6 +472,7 @@
 .gpcMainTabs .sapMITBText {
   font-size: 0.92rem;
   max-width: none;
+  white-space: nowrap;
 }
 
 .gpcSummaryContent {
@@ -567,8 +591,17 @@
 
 @media (max-width: 56rem) {
   .gpcMainTabs {
-    margin-left: 0.75rem;
-    margin-right: 0.75rem;
+    margin: 1rem 0.75rem 0 0.75rem;
+  }
+
+  .gpcMainTabs .sapMITBHead {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .gpcMainTabs .sapMITBFilter {
+    min-width: 6rem;
+    margin-right: 0.25rem;
   }
 
   .gpcSummaryColumn {
