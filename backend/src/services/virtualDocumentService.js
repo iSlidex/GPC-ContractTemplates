@@ -39,8 +39,18 @@ function getMissingRequired(variables, values, source) {
     .map((variable) => variable.name);
 }
 
-function validateRequiredTemplateValues({ variables, values }) {
-  const sourceValues = values || {};
+function applySessionFallbacks(variables, values, userContext = {}) {
+  const resolved = { ...(values || {}) };
+  const requiresEmail = (variables || []).some((variable) => variable.name === "SALES_SUPPORT_EMAIL" && variable.required);
+  if (requiresEmail && !hasRequiredValue(resolved.SALES_SUPPORT_EMAIL)) {
+    // Fallback temporal hasta integrar identidad real SAP/BTP.
+    resolved.SALES_SUPPORT_EMAIL = userContext.email || process.env.GPC_MOCK_USER_EMAIL || "usuario.demo@gpc.local";
+  }
+  return resolved;
+}
+
+function validateRequiredTemplateValues({ variables, values, userContext }) {
+  const sourceValues = applySessionFallbacks(variables, values, userContext);
   const missingSapVariables = getMissingRequired(variables || [], sourceValues, "SAP_VARIABLE");
   const missingUserInputs = getMissingRequired(variables || [], sourceValues, "USER_INPUT");
   const missingRequiredVariables = [...missingSapVariables, ...missingUserInputs];
@@ -104,16 +114,19 @@ function buildVirtualDocumentMetadata({
     inputFields: splitValues.inputFields,
     variables: splitValues.variables,
     generatedAt: now,
-    lastRefreshedAt: refreshed ? now : null
+    lastRefreshedAt: refreshed ? now : null,
+    missingSapVariables,
+    missingUserInputs: missingUserInput,
+    missingRequiredVariables: [...missingSapVariables, ...missingUserInput]
   };
 }
 
-async function refreshVirtualDocument({ template, variables, contractNumber, values }) {
+async function refreshVirtualDocument({ template, variables, contractNumber, values, userContext }) {
   const sapResult = await getContractData(contractNumber, { templateId: template.templateId });
-  const refreshedValues = {
+  const refreshedValues = applySessionFallbacks(variables, {
     ...(values || {}),
     ...(sapResult.values || {})
-  };
+  }, userContext);
 
   const metadata = buildVirtualDocumentMetadata({
     contractNumber,
@@ -145,5 +158,6 @@ module.exports = {
   buildVirtualDocumentMetadata,
   hasRequiredValue,
   refreshVirtualDocument,
-  validateRequiredTemplateValues
+  validateRequiredTemplateValues,
+  applySessionFallbacks
 };

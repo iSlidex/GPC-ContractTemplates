@@ -15,7 +15,7 @@ Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly cl
 
 ## Current known flows
 
-- Main UI is organized into SAP ECM/ECA-inspired tabs using official UX terms: Resumen, Documentos, Plantillas, Cláusulas, Ensamblaje, and Repositorio técnico.
+- Main UI is organized into SAP ECM/ECA-inspired tabs using official UX terms: Resumen, Documentos, Plantillas, Cláusulas, and Repositorio técnico. Ensamblaje remains internal/debug and hidden from the main end-user flow.
 - The frontend owns a local `appContext` model for legal transaction id/name, context, category, simulated profile/roles, and role-filter flags. Query params `contractId`, `context`, `category`, and `profile` can override defaults.
 - Roles are simulated only (`LEGAL_ADMIN`, `LEGAL_USER`, `BUSINESS_USER`, `VIEWER`); do not implement real authentication unless explicitly requested.
 - Template and clause list endpoints accept optional query filters while preserving no-query compatibility.
@@ -25,7 +25,8 @@ Keep the project pragmatic. It is not a full SAP Enterprise Contract Assembly cl
 - Fetch SAP/mock data with `GET /api/sap/contracts/:contractId`.
 - Generate documents with `POST /api/templates/:templateId/generate`.
 - Manage template metadata with `GET /api/templates/:templateId`, `PATCH /api/templates/:templateId/metadata`, and `POST /api/templates/:templateId/actions/:action`.
-- Refresh virtual document variables with `POST /api/virtual-documents/refresh`.
+- Refresh virtual document variables with `POST /api/virtual-documents/refresh`; finalized documents reject refresh/regeneration/editing with `409 DOCUMENT_ALREADY_FINAL`.
+- Finalize completed virtual documents with `POST /api/virtual-documents/:virtualDocumentId/finalize`.
 - Browse curated business documents with `GET /api/documents` (business-facing Documentos tab).
 - Browse the technical file repository with `GET /api/repository` (Repositorio técnico tab only).
 - Preview/download files through `/api/files/*`.
@@ -134,7 +135,7 @@ Document these as alignment/backlog unless the user explicitly asks to implement
 - Add template rules and clause (text block) rules such as `canRemove` and `fixedPosition`.
 - Add conditions with expressions and insert/replace/remove actions.
 - Add alternatives with risk levels `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
-- Add virtual document states `PENDING`, `ERROR`, `COMPLETED`, `FINAL` and Refresh Document behavior.
+- Extend virtual document backlog beyond implemented states `PENDING`, `ERROR`, `COMPLETED`, `FINAL` with richer Refresh Document behavior/history.
 
 ## Safe change policy
 

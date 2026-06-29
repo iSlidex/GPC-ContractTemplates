@@ -28,7 +28,7 @@
 }
 
 .gpcTransactionHeader {
-    padding: 1.25rem 1.5rem 1rem 1.5rem;
+    padding: 1.25rem 1.5rem 1.25rem 1.5rem;
     background: #ffffff;
     border-bottom: 1px solid #d9e2ec;
 }
@@ -63,7 +63,7 @@
 }
 
 .gpcMainTabs {
-    margin: 0 1.25rem 1.5rem 1.25rem;
+    margin: 1rem 1.5rem 1.5rem 1.5rem;
 }
 
 .gpcMainTabs .sapMITBHead {
@@ -82,7 +82,7 @@
 }
 
 .gpcTabContent {
-    padding: 1rem 0.25rem 2rem 0.25rem;
+    padding: 1.25rem 0 2rem 0;
 }
 
 .gpcEcmCard {
@@ -100,7 +100,7 @@
 .gpcCardToolbar {
     background: transparent;
     border: 0;
-    padding: 0.5rem 0;
+    padding: 0.5rem 0 1rem 0;
 }
 
 .gpcPrimaryButton .sapMBtnInner,

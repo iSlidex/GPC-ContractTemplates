@@ -22,7 +22,10 @@ const {
   getTemplates,
   extractTemplateVariables,
   generateContractDocuments,
-  getFileForDownload
+  getFileForDownload,
+  finalizeVirtualDocument,
+  throwIfVirtualDocumentFinal,
+  isSourcePathFinal
 } = require("../services/repositoryService");
 
 const {
@@ -212,14 +215,27 @@ router.get("/templates/:templateId/variables", (req, res, next) => {
 
 router.post("/virtual-documents/refresh", async (req, res, next) => {
   try {
-    const { templateId, contractNumber, values } = req.body || {};
+    const { templateId, contractNumber, values, virtualDocumentId } = req.body || {};
+    throwIfVirtualDocumentFinal({ templateId, contractNumber, virtualDocumentId });
     const variablesInfo = extractTemplateVariables(templateId);
 
     res.json(await refreshVirtualDocument({
       template: variablesInfo.template,
       variables: variablesInfo.variables,
       contractNumber,
-      values: values || {}
+      values: values || {},
+      userContext: req.body && req.body.userContext
+    }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/virtual-documents/:virtualDocumentId/finalize", async (req, res, next) => {
+  try {
+    res.json(finalizeVirtualDocument({
+      virtualDocumentId: req.params.virtualDocumentId,
+      userContext: req.body && req.body.userContext
     }));
   } catch (error) {
     next(error);
@@ -234,7 +250,8 @@ router.post("/templates/:templateId/generate", async (req, res, next) => {
     const result = await generateContractDocuments({
       templateId: req.params.templateId,
       contractNumber,
-      values
+      values,
+      userContext: req.body.userContext
     });
 
     const downloadUrls = {
@@ -357,6 +374,12 @@ router.get("/files/edit/html", async (req, res, next) => {
 router.post("/files/edit/html-version", async (req, res, next) => {
   try {
     const { sourcePath, html, status } = req.body;
+    if (isSourcePathFinal(sourcePath)) {
+      const error = new Error("El documento virtual ya está FINAL. No se puede editar.");
+      error.statusCode = 409;
+      error.code = "DOCUMENT_ALREADY_FINAL";
+      throw error;
+    }
 
     if (!sourcePath) {
       return res.status(400).json({
@@ -449,6 +472,12 @@ router.post("/clauses/:clauseId/variant", (req, res, next) => {
 router.post("/files/edit/docx-version", async (req, res, next) => {
   try {
     const { sourcePath, html, status } = req.body;
+    if (isSourcePathFinal(sourcePath)) {
+      const error = new Error("El documento virtual ya está FINAL. No se puede editar.");
+      error.statusCode = 409;
+      error.code = "DOCUMENT_ALREADY_FINAL";
+      throw error;
+    }
 
     if (!sourcePath) {
       return res.status(400).json({

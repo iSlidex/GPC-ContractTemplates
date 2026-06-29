@@ -26,14 +26,6 @@
                             <Text id="mainDescription" text="{app>/appContext/legalTransactionDisplayName} · ID {app>/appContext/legalTransactionId}" class="gpcTransactionSubtitle" />
                         </VBox>
                         <HBox id="headerActions" wrap="Wrap" alignItems="Center" class="gpcHeaderActions">
-                            <MenuButton id="createDocumentButton" text="Crear documento" icon="sap-icon://add-document" type="Emphasized" class="gpcPrimaryButton">
-                                <menu>
-                                    <Menu id="createDocumentMenu" itemSelected=".onCreateDocumentAction">
-                                        <MenuItem id="uploadDocumentMenuItem" key="upload" text="Cargar archivo" icon="sap-icon://upload" />
-                                        <MenuItem id="createFromTemplateMenuItem" key="template" text="Crear a partir de plantilla" icon="sap-icon://document-text" />
-                                    </Menu>
-                                </menu>
-                            </MenuButton>
                             <Button id="manageClausesButton" text="Gestionar cláusulas" icon="sap-icon://form" press=".onManageClauses" class="gpcSecondaryButton" />
                         </HBox>
                     </HBox>
@@ -116,14 +108,6 @@
                                                         <Text text="✓ Revisar ensamblaje y cláusulas" />
                                                     </VBox>
                                                     <HBox wrap="Wrap" class="gpcActionRow">
-                                                        <MenuButton id="summaryCreateDocumentButton" text="Crear documento" icon="sap-icon://add-document" type="Emphasized" class="gpcPrimaryButton">
-                                                            <menu>
-                                                                <Menu id="summaryCreateDocumentMenu" itemSelected=".onCreateDocumentAction">
-                                                                    <MenuItem id="summaryUploadDocumentMenuItem" key="upload" text="Cargar archivo" icon="sap-icon://upload" />
-                                                                    <MenuItem id="summaryCreateFromTemplateMenuItem" key="template" text="Crear a partir de plantilla" icon="sap-icon://document-text" />
-                                                                </Menu>
-                                                            </menu>
-                                                        </MenuButton>
                                                         <Button text="Ver documentos" icon="sap-icon://documents" press=".onGoToDocuments" />
                                                         <Button text="Ver plantillas" icon="sap-icon://document-text" press=".onGoToTemplates" />
                                                     </HBox>
@@ -146,7 +130,7 @@
                                     <MenuButton id="documentsCreateButton" text="Crear documento" icon="sap-icon://add-document" type="Emphasized">
                                         <menu>
                                             <Menu id="documentsCreateMenu" itemSelected=".onCreateDocumentAction">
-                                                <MenuItem id="documentsUploadMenuItem" key="upload" text="Cargar archivo" icon="sap-icon://upload" />
+                                                <MenuItem id="documentsUploadMenuItem" key="upload" text="Cargar archivo (Próximamente)" icon="sap-icon://upload" enabled="false" />
                                                 <MenuItem id="documentsTemplateMenuItem" key="template" text="Crear a partir de plantilla" icon="sap-icon://document-text" />
                                             </Menu>
                                         </menu>
@@ -179,7 +163,7 @@
                                         <Column width="15rem"><Text text="Plantilla / versión" /></Column>
                                         <Column width="7rem"><Text text="Tipo" /></Column>
                                         <Column width="10rem"><Text text="Estado" /></Column>
-                                        <Column width="11rem"><Text text="Ensamblaje" /></Column>
+                                        <Column width="11rem"><Text text="Documento virtual" /></Column>
                                         <Column width="12rem"><Text text="Última modificación" /></Column>
                                         <Column width="20rem"><Text text="Acciones" /></Column>
                                     </columns>
@@ -201,9 +185,9 @@
                                                 <HBox renderType="Bare" wrap="Wrap">
                                                     <Button text="Vista previa" icon="sap-icon://show" type="Transparent" press=".onDocumentPreview" />
                                                     <Button text="Descargar" icon="sap-icon://download" type="Transparent" press=".onDocumentDownload" />
-                                                    <Button text="Editar" icon="sap-icon://edit" type="Transparent" press=".onDocumentEdit" />
+                                                    <Button text="Editar" icon="sap-icon://edit" type="Transparent" enabled="{app>canEditDocument}" press=".onDocumentEdit" />
                                                     <Button text="Detalle" icon="sap-icon://detail-view" type="Transparent" press=".onDocumentAction" />
-                                                    <Button text="Ensamblaje" icon="sap-icon://synchronize" type="Transparent" press=".onDocumentAssembly" />
+                                                    <Button text="Marcar como final" icon="sap-icon://accept" type="Transparent" visible="{app>canFinalize}" press=".onFinalizeDocument" />
                                                     <Button text="Versiones" icon="sap-icon://history" type="Transparent" press=".onDocumentVersions" />
                                                 </HBox>
                                             </cells>
@@ -368,7 +352,7 @@
                             </VBox>
                         </IconTabFilter>
 
-                        <IconTabFilter id="virtualDocumentTab" key="virtual" text="Ensamblaje" icon="sap-icon://synchronize">
+                        <IconTabFilter id="virtualDocumentTab" key="virtual" text="Ensamblaje" icon="sap-icon://synchronize" visible="false">
                             <VBox id="virtualDocumentContent" class="gpcTabContent">
                                 <Toolbar class="gpcCardToolbar">
                                     <VBox>
